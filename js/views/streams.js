@@ -52,7 +52,8 @@ Views.streams = function (meta, video, startAt, auto) {
         var focused = Nav.current();
         var keep = focused && list.contains(focused) ? focused._stream : null;
         var r = ranked();
-        var hidden = all.filter(function (s) { return s.playable && s.compat === 'bad'; }).length;
+        var hidden = all.filter(function (s) { return s.playable && s.compat === 'bad' && !Streams.isDead(s); }).length;
+        var dead = all.filter(function (s) { return s.playable && Streams.isDead(s); }).length;
         toggle.textContent = showBad ? 'Masquer les sources à risque' : 'Afficher les sources à risque (' + hidden + ')';
         toggle.style.display = hidden ? '' : 'none';
         U.clear(list);
@@ -69,6 +70,9 @@ Views.streams = function (meta, video, startAt, auto) {
                 ? 'Aucune source lisible : ' + torrentOnly + ' source(s) torrent sans Real-Debrid. Vérifie que Torrentio est configuré avec ta clé Real-Debrid (sur le PC).'
                 : (hidden ? 'Seulement des sources à risque : affiche-les avec le bouton en haut.' : 'Aucune source trouvée.');
         } else status.textContent = '';
+        if (dead && done >= total) {
+            status.textContent += (status.textContent ? ' ' : '') + dead + ' source(s) indisponible(s) sur Real-Debrid masquée(s).';
+        }
         if (App.top() && App.top().el === el) {
             if (refocus) Nav.focus(refocus);
             else if (!focused || !el.contains(focused) || !document.body.contains(focused)) Nav.focusFirst(el);
@@ -102,5 +106,6 @@ Views.streams = function (meta, video, startAt, auto) {
     total = API.addons().filter(function (a) { return API.supports(a, 'stream', type, vid); }).length;
     render();
 
-    return { name: 'streams', el: el };
+    // Coming back from the player: dead sources may have been detected meanwhile.
+    return { name: 'streams', el: el, onShow: function () { if (all.length) render(); } };
 };

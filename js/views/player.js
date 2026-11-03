@@ -60,7 +60,32 @@ Views.player = function (opts) {
         App.pop();
     }
 
+    // Debrid placeholder clip (≈30 s "not available" video) instead of the film.
+    function looksLikePlaceholder() {
+        var d = v.duration;
+        if (!d || !isFinite(d) || d > 90) return false;
+        var rt = parseInt(String(meta.runtime || ''), 10);
+        return !(rt && rt < 3);                      // genuinely short content: keep it
+    }
+
+    function skipUnavailable() {
+        Streams.markDead(stream);
+        var rest = opts.sources.filter(function (s) { return s !== stream && !Streams.isDead(s); });
+        var next = rest[0];
+        if (!next) {
+            showError(stream.cached === false
+                ? 'Real-Debrid télécharge encore ce fichier. Réessaie dans quelques minutes ou choisis une autre source.'
+                : 'Cette source n’est plus disponible sur Real-Debrid et il n’y en a pas d’autre.');
+            return;
+        }
+        U.toast(stream.cached === false ? 'Pas encore prêt sur Real-Debrid : source suivante…'
+            : 'Source indisponible sur Real-Debrid : source suivante…');
+        App.pop();
+        App.push(Views.player({ meta: meta, video: video, stream: next, startAt: opts.startAt, sources: rest }));
+    }
+
     v.addEventListener('loadedmetadata', function () {
+        if (looksLikePlaceholder()) { v.muted = true; v.pause(); skipUnavailable(); return; }
         if (opts.startAt > 5 && opts.startAt < v.duration - 30) v.currentTime = opts.startAt;
         pickFrenchAudio();
         updateInfo();

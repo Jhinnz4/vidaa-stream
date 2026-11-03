@@ -126,6 +126,36 @@ test('player controls: audio note, French subtitles drawn by the app', async ({ 
   await expect(page.locator('.player-subs')).toHaveText('Bonjour tout le monde');
 });
 
+test('debrid "not available" clip: skips to the next source and hides the dead one', async ({ page }) => {
+  await mock(page);
+  // Every media URL "plays" a 30 s clip, like the debrid placeholder video.
+  await page.addInitScript(() => {
+    Object.defineProperty(HTMLMediaElement.prototype, 'duration', { get() { return this.src ? 30 : NaN; } });
+    const origPlay = HTMLMediaElement.prototype.play;
+    HTMLMediaElement.prototype.play = function () {
+      setTimeout(() => this.dispatchEvent(new Event('loadedmetadata')), 50);
+      return Promise.resolve();
+    };
+  });
+  await page.route('https://media.test/**', () => {});
+  await page.goto('/');
+  await expect(page.locator('.row')).toHaveCount(2);
+  await key(page, 'Enter');
+  await key(page, 'Enter');
+  await expect(page.locator('.source')).toHaveCount(3);
+  await key(page, 'Enter');
+  // All three are placeholders: chain through them, then explain.
+  await expect(page.locator('.player-error')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.player-error p')).toContainText('plus disponible');
+  await key(page, 'Backspace');
+  await expect(page.locator('.source')).toHaveCount(0);
+  await expect(page.locator('.page-body > p')).toContainText('3 source(s) indisponible(s)');
+  // The not-yet-cached one is only hidden temporarily; cached ones for good.
+  const dead = await page.evaluate(() => JSON.parse(localStorage.getItem('sp_deadSources')));
+  expect(Object.values(dead).filter((v) => v === 0)).toHaveLength(2);
+  expect(Object.values(dead).filter((v) => v > Date.now())).toHaveLength(1);
+});
+
 test('progress is saved on an existing library item without dropping its fields', async ({ page }) => {
   const item = { _id: 'tt1000000', name: 'Film 1', type: 'movie', poster: null, posterShape: 'poster', removed: false, temp: false,
     _ctime: '2026-01-01T00:00:00.000Z', _mtime: '2026-01-01T00:00:00.000Z', customField: 42,

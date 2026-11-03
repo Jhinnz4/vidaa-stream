@@ -69,7 +69,7 @@ var Streams = (function () {
         var resRank = prefs.quality === '4K' ? RES_RANK_4K : RES_RANK_1080;
         var compatRank = { ok: 0, risk: 1, bad: 2 };
         return list.filter(function (s) {
-            return s.playable && !(prefs.hideBad && s.compat === 'bad');
+            return s.playable && !(prefs.hideBad && s.compat === 'bad') && !isDead(s);
         }).map(function (s) {
             s.score = compatRank[s.compat] * 1000
                 + (prefs.preferFrench && !s.french ? 100 : 0)
@@ -93,5 +93,42 @@ var Streams = (function () {
         return first || (raw.behaviorHints && raw.behaviorHints.filename) || raw.name || 'Source';
     }
 
-    return { parse: parse, rank: rank, langLabel: langLabel, title: title };
+    // ── Dead sources ──
+    // A debrid link that is gone (copyright removal, failed download…) plays a
+    // ~30 s placeholder clip instead of the film. The player detects it and
+    // records the source here so the list hides it next time. Not-yet-cached
+    // sources ("À télécharger") are only hidden for a while: they may come back.
+    var DEAD_KEY = 'deadSources';
+    var TEMP_MS = 30 * 60 * 1000;
+
+    function keyOf(s) {
+        var raw = s.raw || s;
+        if (raw.infoHash) return String(raw.infoHash).toLowerCase() + ':' + (raw.fileIdx || 0);
+        var m = String(raw.url || '').match(/\b([a-f0-9]{40})\b/i);
+        var idx = String(raw.url || '').match(/\/([a-f0-9]{40})\/[^/]*\/(\d+)\//i);
+        if (m) return m[1].toLowerCase() + ':' + (idx ? idx[2] : '0');
+        return String(raw.url || '');
+    }
+
+    function deadMap() {
+        var map = U.store.get(DEAD_KEY, {}), now = Date.now(), changed = false;
+        Object.keys(map).forEach(function (k) {
+            if (map[k] && map[k] < now) { delete map[k]; changed = true; }
+        });
+        if (changed) U.store.set(DEAD_KEY, map);
+        return map;
+    }
+
+    function markDead(s) {
+        var map = deadMap();
+        map[keyOf(s)] = s.cached === false ? Date.now() + TEMP_MS : 0;   // 0 = for good
+        U.store.set(DEAD_KEY, map);
+    }
+
+    function isDead(s) { return deadMap().hasOwnProperty(keyOf(s)); }
+    function clearDead() { U.store.del(DEAD_KEY); }
+    function deadCount() { return Object.keys(deadMap()).length; }
+
+    return { parse: parse, rank: rank, langLabel: langLabel, title: title,
+        markDead: markDead, isDead: isDead, clearDead: clearDead, deadCount: deadCount };
 })();

@@ -34,6 +34,18 @@ Views.settings = function () {
         API.loadAddons().then(function () { return API.loadLibrary(); }).then(function () { App.boot(); });
     } }, h('div', null, h('div.setting-label', { text: 'Recharger les addons' }),
         h('div.muted.small', { text: 'Après avoir installé ou configuré un addon sur le PC.' }))));
+    var deadDesc = h('div.muted.small');
+    function refreshDead() {
+        var n = Streams.deadCount();
+        deadDesc.textContent = n ? n + ' source(s) détectée(s) comme indisponibles sur Real-Debrid sont masquées.'
+            : 'Aucune source masquée.';
+    }
+    refreshDead();
+    list.appendChild(h('div.setting.f', { 'data-vanchor': '', onSelect: function () {
+        Streams.clearDead();
+        refreshDead();
+        U.toast('Les sources masquées sont de nouveau affichées');
+    } }, h('div', null, h('div.setting-label', { text: 'Réafficher les sources indisponibles' }), deadDesc)));
     list.appendChild(h('div.setting.f', { 'data-vanchor': '', onSelect: function () {
         App.dialog({ title: 'Se déconnecter ?', buttons: [
             { label: 'Déconnexion', action: function () { API.logout(); App.reset(Views.login()); } },
