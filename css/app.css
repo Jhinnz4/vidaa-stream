@@ -1,0 +1,151 @@
+/* 1rem = screen height / 54 (set in app.js). Cheap effects only: TV GPUs are weak. */
+:root {
+    --bg: #0d0f14; --panel: #171a22; --panel2: #222632; --text: #f2f3f5; --muted: #9aa0ad;
+    --accent: #7b5cff; --focus: #ffffff; --good: #2fb87a; --warn: #d9a13b; --bad: #e0565b; --fr: #3a6df0;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; font-size: 1rem; }
+button { font: inherit; color: inherit; border: 0; background: none; }
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+.small { font-size: 0.8rem; }
+
+#root, .layer { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+.layer.overlay { background: rgba(0, 0, 0, 0.72); display: flex; align-items: center; justify-content: center; }
+
+/* Focus ring: one consistent look everywhere. */
+.f { outline: none; }
+.f.focused { box-shadow: 0 0 0 0.2rem var(--focus); }
+
+.btn { display: inline-block; padding: 0.7rem 1.4rem; border-radius: 0.5rem; background: var(--panel2); font-size: 1rem; margin-right: 0.7rem; }
+.btn.primary { background: var(--accent); }
+.btn.small { padding: 0.45rem 1rem; font-size: 0.9rem; }
+.btn.focused { background: var(--focus); color: #000; box-shadow: none; }
+.btn.selected { background: #3b3f50; }
+.btn.selected.focused { background: var(--focus); }
+
+.spinner { width: 3rem; height: 3rem; border-radius: 50%; border: 0.3rem solid rgba(255,255,255,0.2);
+    border-top-color: #fff; animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.splash, .splash-inline { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; height: 100%; text-align: center; padding: 2rem; }
+
+.toast { position: fixed; bottom: 2.5rem; left: 50%; transform: translateX(-50%); background: rgba(20,22,30,0.95);
+    padding: 0.8rem 1.6rem; border-radius: 2rem; z-index: 50; font-size: 1rem; }
+
+/* ── Screens with sidebar ── */
+.screen { display: flex; height: 100%; }
+.sidebar { width: 11rem; flex: none; background: #0a0b0f; padding: 1.6rem 0.8rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.brand { font-size: 1.4rem; font-weight: 700; padding: 0 0.8rem 1.4rem; color: var(--accent); }
+.side-item { padding: 0.8rem; border-radius: 0.5rem; color: var(--muted); font-size: 1.05rem; }
+.side-item.active { color: var(--text); background: var(--panel); }
+.side-item.focused { background: var(--focus); color: #000; box-shadow: none; }
+.content { flex: 1; overflow: hidden; padding: 1.4rem 0 3rem 1.6rem; }
+.sy { overflow-y: hidden; }
+.sx { overflow-x: hidden; }
+
+/* ── Rows of posters ── */
+.row { margin-bottom: 1.4rem; }
+.row h3 { font-size: 1.15rem; font-weight: 600; margin: 0 0 0.6rem 0.2rem; }
+.row-items { display: flex; gap: 0.9rem; padding: 0.4rem 1.6rem 0.4rem 0.4rem; }
+.card { flex: none; width: 8.6rem; border-radius: 0.5rem; }
+.card-img { position: relative; width: 8.6rem; height: 12.9rem; border-radius: 0.5rem; overflow: hidden; background: var(--panel); }
+.card-img img, .poster-empty { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card.focused { box-shadow: none; }
+.card.focused .card-img { box-shadow: 0 0 0 0.25rem var(--focus); }
+.card-title { font-size: 0.85rem; margin-top: 0.4rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+.card.focused .card-title { color: var(--text); }
+.card-sub { font-size: 0.75rem; color: var(--muted); }
+.card-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 0.35rem; background: rgba(0,0,0,0.6); }
+.card-progress div { height: 100%; background: var(--accent); }
+
+/* ── Search ── */
+.search-bar { padding: 0.4rem 1.6rem 1.2rem 0.4rem; }
+.search-input { width: 100%; font: inherit; font-size: 1.3rem; padding: 0.9rem 1.2rem; border-radius: 0.6rem;
+    border: 0.15rem solid var(--panel2); background: var(--panel); color: var(--text); }
+.search-input.focused { border-color: var(--focus); box-shadow: none; }
+
+/* ── Detail ── */
+.detail { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
+.detail-bg { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background-size: cover; background-position: center top; opacity: 0.35; }
+.detail-body { position: absolute; top: 0; right: 0; bottom: 0; left: 0; padding: 3rem 4rem; background: linear-gradient(90deg, rgba(13,15,20,0.95) 35%, rgba(13,15,20,0.4)); }
+.detail-head { max-width: 46rem; padding-bottom: 1.6rem; }
+.detail-head h1 { font-size: 2.6rem; margin-bottom: 0.6rem; }
+.detail-logo { max-width: 24rem; max-height: 7rem; margin-bottom: 1rem; display: block; }
+.detail-info { color: var(--muted); margin-bottom: 1rem; }
+.detail-desc { line-height: 1.45; margin-bottom: 1.6rem; max-height: 7.3rem; overflow: hidden; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.6rem 0; }
+.seasons { display: flex; padding: 0.3rem; margin-bottom: 0.8rem; }
+.episodes { display: flex; flex-direction: column; gap: 0.6rem; max-width: 60rem; padding: 0.3rem; }
+.episode { display: flex; gap: 1rem; padding: 0.6rem; border-radius: 0.6rem; background: rgba(34,38,50,0.6); }
+.ep-thumb { position: relative; width: 11rem; height: 6.2rem; flex: none; border-radius: 0.4rem; overflow: hidden; background: var(--panel); }
+.ep-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.ep-title { font-weight: 600; margin-bottom: 0.3rem; }
+.ep-desc { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; max-height: 2.4rem; overflow: hidden; }
+
+/* ── Sources ── */
+.page { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; padding: 2rem 3rem 0; }
+.page-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.page-head h2 { font-size: 1.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.page-body { flex: 1; padding: 0.3rem 0.3rem 3rem; }
+.sources { display: flex; flex-direction: column; gap: 0.6rem; }
+.source { padding: 0.8rem 1rem; border-radius: 0.6rem; background: var(--panel); }
+.source-badges { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.45rem; }
+.badge { font-size: 0.8rem; padding: 0.15rem 0.55rem; border-radius: 0.3rem; background: var(--panel2); }
+.badge.good { background: var(--good); color: #04140c; }
+.badge.warn { background: var(--warn); color: #1b1100; }
+.badge.bad { background: var(--bad); }
+.badge.fr { background: var(--fr); }
+.source-title { font-size: 0.95rem; word-break: break-all; margin-bottom: 0.2rem; }
+
+/* ── Dialogs / menus ── */
+.dialog, .menu { background: var(--panel); border-radius: 0.8rem; padding: 1.8rem 2rem; max-width: 40rem; }
+.dialog h2, .menu h2 { font-size: 1.4rem; margin-bottom: 0.8rem; }
+.dialog p { color: var(--muted); line-height: 1.4; margin-bottom: 1.2rem; }
+.dialog-buttons { display: flex; flex-wrap: wrap; gap: 0.6rem 0; }
+.menu { min-width: 26rem; max-height: 44rem; }
+.menu-note { color: var(--muted); line-height: 1.4; margin-bottom: 1rem; }
+.menu-item { padding: 0.75rem 1rem; border-radius: 0.5rem; display: flex; justify-content: space-between; gap: 1rem; }
+.menu-item small { color: var(--muted); }
+.menu-item.focused { background: var(--focus); color: #000; box-shadow: none; }
+.menu-item.focused small { color: #333; }
+
+/* ── Settings ── */
+.content > h2 { font-size: 1.6rem; margin-bottom: 1.2rem; }
+.settings { display: flex; flex-direction: column; gap: 0.6rem; max-width: 52rem; padding: 0.3rem; }
+.setting { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; padding: 0.9rem 1.2rem; border-radius: 0.6rem; background: var(--panel); }
+.setting-label { font-size: 1.05rem; margin-bottom: 0.2rem; }
+.setting-value { flex: none; color: var(--accent); font-weight: 600; }
+.setting.focused .setting-value { color: var(--text); }
+
+/* ── Login ── */
+.login { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 1rem; text-align: center; }
+.login h1 { font-size: 2.6rem; color: var(--accent); }
+.login ol { text-align: left; line-height: 1.8; margin-left: 1.4rem; }
+.login-row { display: flex; align-items: center; gap: 2.5rem; margin: 1rem 0; }
+.login-code { font-size: 4.5rem; font-weight: 700; letter-spacing: 0.6rem; font-family: monospace; }
+.login-qr { width: 10rem; height: 10rem; background: #fff; border-radius: 0.5rem; }
+
+/* ── Player ── */
+.player { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: #000; }
+.player-video { position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.player-subs { position: absolute; left: 8%; right: 8%; bottom: 7%; text-align: center; white-space: pre-line;
+    font-size: 2rem; line-height: 1.3; color: #fff; text-shadow: 0 0 0.25rem #000, 0.1rem 0.1rem 0.15rem #000, -0.1rem -0.1rem 0.15rem #000; pointer-events: none; }
+.osd:not(.hidden) ~ .player-subs, .player-subs { transition: none; }
+.player-spinner { position: absolute; left: 50%; top: 50%; margin: -1.5rem 0 0 -1.5rem; }
+.seek-badge { position: absolute; top: 42%; left: 50%; transform: translateX(-50%); font-size: 2.4rem; font-weight: 700;
+    background: rgba(0,0,0,0.6); padding: 0.6rem 1.6rem; border-radius: 0.8rem; }
+.osd { position: absolute; top: 0; right: 0; bottom: 0; left: 0; display: flex; flex-direction: column; justify-content: space-between;
+    background: linear-gradient(rgba(0,0,0,0.75), rgba(0,0,0,0) 25%, rgba(0,0,0,0) 60%, rgba(0,0,0,0.85)); }
+.osd-top { display: flex; justify-content: space-between; padding: 2rem 3rem; }
+.osd-title { font-size: 1.6rem; font-weight: 600; }
+.osd-bottom { padding: 0 3rem 2.4rem; }
+.osd-times { display: flex; align-items: center; gap: 1.2rem; margin-bottom: 1.2rem; font-variant-numeric: tabular-nums; }
+.progress { position: relative; flex: 1; height: 0.4rem; background: rgba(255,255,255,0.25); border-radius: 0.2rem; }
+.progress-buf, .progress-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 0.2rem; }
+.progress-buf { background: rgba(255,255,255,0.35); }
+.progress-fill { background: var(--accent); }
+.progress-knob { position: absolute; top: 50%; width: 1rem; height: 1rem; margin: -0.5rem 0 0 -0.5rem; border-radius: 50%; background: #fff; display: none; }
+.progress.focused { box-shadow: none; height: 0.6rem; }
+.progress.focused .progress-knob { display: block; width: 1.4rem; height: 1.4rem; margin: -0.7rem 0 0 -0.7rem; }
+.player-error { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; }
