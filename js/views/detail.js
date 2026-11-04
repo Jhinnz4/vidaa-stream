@@ -19,8 +19,13 @@ Views.detail = function (type, id, preview) {
         return { videoId: it.state.video_id || id, time: it.state.timeOffset / 1000, duration: it.state.duration / 1000 };
     }
 
-    function openStreams(video, startAt) {
-        App.push(Views.streams(meta, video, startAt));
+    // Play buttons start the best source directly; "Choisir la source" opens the list.
+    function openStreams(video, startAt, manual) {
+        App.push(Views.streams(meta, video, startAt, manual ? null : { best: true }));
+    }
+
+    function chooseButton(video, startAt) {
+        return h('button.btn.f', { text: 'Choisir la source', onSelect: function () { openStreams(video, startAt, true); } });
     }
 
     function infoLine(m) {
@@ -75,6 +80,7 @@ Views.detail = function (type, id, preview) {
             } else {
                 actions.appendChild(h('button.btn.primary.f.autofocus', { text: '▶ Lecture', onSelect: function () { openStreams(null, 0); } }));
             }
+            actions.appendChild(chooseButton(null, r && r.time > 30 ? r.time : 0));
             actions.appendChild(listButton());
             return;
         }
@@ -87,6 +93,7 @@ Views.detail = function (type, id, preview) {
             actions.appendChild(h('button.btn.primary.f.autofocus', {
                 text: '▶ Reprendre ' + epLabel(resumeVid) + (res.time > 30 ? ' à ' + U.fmtTime(res.time) : ''),
                 onSelect: function () { openStreams(resumeVid, res.time); } }));
+            actions.appendChild(chooseButton(resumeVid, res.time));
         }
         actions.appendChild(listButton());
         var seasons = [];

@@ -130,7 +130,7 @@ test('my list: add from the detail page (synced for the owner), shown on home an
   await expect(page.locator('.row')).toHaveCount(2);
   await key(page, 'Enter');
   await expect(page.locator('.detail h1')).toHaveText('Le Film');
-  await key(page, 'ArrowRight');
+  await key(page, 'ArrowRight', 2);
   expect((await focused(page)).text).toBe('+ Ma liste');
   await key(page, 'Enter');
   expect((await focused(page)).text).toBe('✓ Dans ma liste');
@@ -160,54 +160,72 @@ test('browse: Films grid with genre filter', async ({ page }) => {
   expect((await focused(page)).cls).toContain('card');
 });
 
-test('sources: French first, risky last and flagged, torrent-only hidden', async ({ page }) => {
-  await mock(page);
+const videoSrc = (page) => page.evaluate(() => { const v = document.querySelector('video'); return v ? v.getAttribute('src') || '' : ''; });
+
+async function openFilm(page) {
   await start(page);
   await expect(page.locator('.row')).toHaveCount(2);
   await key(page, 'Enter');
   await expect(page.locator('.detail h1')).toHaveText('Le Film');
+}
+
+test('sources list ("Choisir la source"): MULTI+VF instant > instant > quality, risky last, torrent-only hidden', async ({ page }) => {
+  await mock(page);
+  await openFilm(page);
+  await key(page, 'ArrowRight');
+  expect((await focused(page)).text).toBe('Choisir la source');
   await key(page, 'Enter');
-  await expect(page.locator('.source')).toHaveCount(3);
+  await expect(page.locator('.source')).toHaveCount(4);
   const titles = await page.locator('.source-title').allTextContents();
-  expect(titles[0]).toContain('TRUEFRENCH');
-  expect(titles[1]).toContain('x264');
-  expect(titles[2]).toContain('REMUX');
-  await expect(page.locator('.source').nth(2).locator('.badge.bad')).toContainText('DTS');
-  await expect(page.locator('.source').nth(0).locator('.badge.fr')).toHaveText('VF');
-  expect((await focused(page)).text).toContain('TRUEFRENCH');
-  // Hide risky sources.
+  expect(titles[0]).toContain('MULTI.VFF');        // instant + MULTI with VF
+  expect(titles[1]).toContain('x264');             // instant (EN)
+  expect(titles[2]).toContain('TRUEFRENCH');       // not instant
+  expect(titles[3]).toContain('REMUX');            // risky for the TV
+  await expect(page.locator('.source').nth(0).locator('.badge.best')).toHaveText('★ Meilleur choix');
+  await expect(page.locator('.source').nth(3).locator('.badge.bad')).toContainText('DTS');
+  expect((await focused(page)).text).toContain('MULTI.VFF');
   await key(page, 'ArrowUp');
-  await key(page, 'Enter');
-  await expect(page.locator('.source')).toHaveCount(2);
+  await key(page, 'Enter');                        // hide risky sources
+  await expect(page.locator('.source')).toHaveCount(3);
 });
 
-test('player: unreadable file shows an error with next-source; audio menu explains the limit', async ({ page }) => {
+test('"Lecture" plays the best source directly; the player can switch source in place', async ({ page }) => {
   await mock(page);
-  await start(page);
-  await expect(page.locator('.row')).toHaveCount(2);
+  await page.route('https://media.test/**', () => {});      // media never answers: player stays up
+  await openFilm(page);
+  await key(page, 'Enter');                                  // ▶ Lecture
+  await expect(page.locator('.player')).toBeVisible();
+  await expect.poll(() => videoSrc(page)).toContain('d.mp4');
+  await key(page, 'ArrowUp');
+  await key(page, 'ArrowRight', 3);
+  expect((await focused(page)).text).toBe('Sources');
   await key(page, 'Enter');
-  await expect(page.locator('.detail h1')).toHaveText('Le Film');
+  await expect(page.locator('.menu-item')).toHaveCount(5);   // 4 sources + full list
+  await expect(page.locator('.menu-item').first()).toContainText('✓');
+  await key(page, 'ArrowDown');
   await key(page, 'Enter');
-  await expect(page.locator('.source')).toHaveCount(3);
+  await expect.poll(() => videoSrc(page)).toContain('b.mp4');
+  // Back from the player: the full list is right there.
+  await key(page, 'Backspace');
+  await expect(page.locator('.source')).toHaveCount(4);
+});
+
+test('player: unreadable file shows an error with next-source', async ({ page }) => {
+  await mock(page);
+  await openFilm(page);
   await key(page, 'Enter');
   await expect(page.locator('.player-error')).toBeVisible({ timeout: 10000 });
   expect((await focused(page)).text).toBe('Source suivante');
   await key(page, 'Enter');
   await expect(page.locator('.player-error')).toBeVisible({ timeout: 10000 });
-  // Back from the error returns to the source list.
   await key(page, 'Backspace');
-  await expect(page.locator('.source')).toHaveCount(3);
+  await expect(page.locator('.source')).toHaveCount(4);
 });
 
 test('player controls: audio note, French subtitles drawn by the app', async ({ page }) => {
   await mock(page);
-  await start(page);
-  await expect(page.locator('.row')).toHaveCount(2);
-  await key(page, 'Enter');
-  await key(page, 'Enter');
-  await expect(page.locator('.source')).toHaveCount(3);
-  // Media never answers, so the player stays up and the controls can be exercised.
-  await page.route('https://media.test/**', () => {});      // never answers: stays loading
+  await page.route('https://media.test/**', () => {});
+  await openFilm(page);
   await key(page, 'Enter');
   await expect(page.locator('.player')).toBeVisible();
   await key(page, 'ArrowUp');
@@ -217,7 +235,7 @@ test('player controls: audio note, French subtitles drawn by the app', async ({ 
   expect((await focused(page)).text).toBe('Audio');
   await key(page, 'Enter');
   await expect(page.locator('.menu-note')).toContainText('source marquée VF');
-  await key(page, 'Backspace');                    // closes the menu, focus back on "Audio"
+  await key(page, 'Backspace');
   expect((await focused(page)).text).toBe('Audio');
   await key(page, 'ArrowRight');
   expect((await focused(page)).text).toBe('Sous-titres');
@@ -234,28 +252,23 @@ test('debrid "not available" clip: skips to the next source and hides the dead o
   // Every media URL "plays" a 30 s clip, like the debrid placeholder video.
   await page.addInitScript(() => {
     Object.defineProperty(HTMLMediaElement.prototype, 'duration', { get() { return this.src ? 30 : NaN; } });
-    const origPlay = HTMLMediaElement.prototype.play;
     HTMLMediaElement.prototype.play = function () {
       setTimeout(() => this.dispatchEvent(new Event('loadedmetadata')), 50);
       return Promise.resolve();
     };
   });
   await page.route('https://media.test/**', () => {});
-  await start(page);
-  await expect(page.locator('.row')).toHaveCount(2);
+  await openFilm(page);
   await key(page, 'Enter');
-  await key(page, 'Enter');
-  await expect(page.locator('.source')).toHaveCount(3);
-  await key(page, 'Enter');
-  // All three are placeholders: chain through them, then explain.
-  await expect(page.locator('.player-error')).toBeVisible({ timeout: 10000 });
+  // All four are placeholders: chain through them, then explain.
+  await expect(page.locator('.player-error')).toBeVisible({ timeout: 15000 });
   await expect(page.locator('.player-error p')).toContainText('plus disponible');
   await key(page, 'Backspace');
   await expect(page.locator('.source')).toHaveCount(0);
-  await expect(page.locator('.page-body > p')).toContainText('3 source(s) indisponible(s)');
+  await expect(page.locator('.page-body > p')).toContainText('4 source(s) indisponible(s)');
   // The not-yet-cached one is only hidden temporarily; cached ones for good.
   const dead = await page.evaluate(() => JSON.parse(localStorage.getItem('sp_deadSources')));
-  expect(Object.values(dead).filter((v) => v === 0)).toHaveLength(2);
+  expect(Object.values(dead).filter((v) => v === 0)).toHaveLength(3);
   expect(Object.values(dead).filter((v) => v > Date.now())).toHaveLength(1);
 });
 

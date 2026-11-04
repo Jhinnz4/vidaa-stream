@@ -65,16 +65,30 @@ var Streams = (function () {
     var RES_RANK_1080 = { '1080p': 0, '4K': 1, '720p': 2, '480p': 4, '': 3 };
     var RES_RANK_4K = { '4K': 0, '1080p': 1, '720p': 2, '480p': 4, '': 3 };
 
+    // Order (also what "Lecture" auto-picks), within playable sources:
+    //   1. MULTI with VF + instant   2. VF + instant   3. instant, best quality first
+    //   4. not instant, best quality first (VF breaks ties)
+    // Sources likely unreadable by the TV (DTS, TrueHD, REMUX…) always come last.
+    function tier(s, prefs) {
+        var instant = s.cached === true;
+        var multiFr = s.french && (s.multi || s.langs.length > 1);
+        if (instant && prefs.preferFrench && multiFr) return 0;
+        if (instant && prefs.preferFrench && s.french) return 1;
+        if (instant) return 2;
+        return 3;
+    }
+
     function rank(list, prefs) {
         var resRank = prefs.quality === '4K' ? RES_RANK_4K : RES_RANK_1080;
-        var compatRank = { ok: 0, risk: 1, bad: 2 };
         return list.filter(function (s) {
             return s.playable && !(prefs.hideBad && s.compat === 'bad') && !isDead(s);
         }).map(function (s) {
-            s.score = compatRank[s.compat] * 1000
-                + (prefs.preferFrench && !s.french ? 100 : 0)
-                + (s.cached === false ? 50 : 0)
-                + resRank[s.res] * 5;
+            s.tier = tier(s, prefs);
+            s.score = (s.compat === 'bad' ? 100000 : 0)
+                + s.tier * 1000
+                + resRank[s.res] * 10
+                + (s.compat === 'risk' ? 5 : 0)
+                + (s.tier === 3 && prefs.preferFrench && !s.french ? 1 : 0);
             return s;
         }).sort(function (a, b) { return a.score - b.score || a.index - b.index; });
     }

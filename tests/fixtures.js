@@ -25,6 +25,7 @@ const movieStreams = [
   { name: '[RD+] Torrentio\n4k', title: 'Movie.2160p.BluRay.REMUX.DTS-HD.MA\n💾 40.1 GB ⚙️ X', url: 'https://media.test/a.mkv' },
   { name: '[RD+] Torrentio\n1080p', title: 'Movie.1080p.WEB.x264-GRP\n💾 2.1 GB ⚙️ X\n🇬🇧', url: 'https://media.test/b.mp4', behaviorHints: { bingeGroup: 'g1' } },
   { name: '[RD download] Torrentio\n1080p', title: 'Movie.MULTI.TRUEFRENCH.1080p.WEB\n💾 3 GB ⚙️ X\n🇫🇷 / 🇬🇧', url: 'https://media.test/c.mp4' },
+  { name: '[RD+] Torrentio\n720p', title: 'Movie.MULTI.VFF.720p.WEB\n💾 1.2 GB ⚙️ X\n🇫🇷 / 🇬🇧', url: 'https://media.test/d.mp4' },
   { name: 'Torrentio\n1080p', title: 'Torrent only', infoHash: 'abcdef' },
 ];
 

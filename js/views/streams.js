@@ -60,7 +60,10 @@ Views.streams = function (meta, video, startAt, auto) {
         var refocus = null;
         r.forEach(function (s, i) {
             var e = item(s);
-            if (i === 0) e.classList.add('autofocus');
+            if (i === 0) {
+                e.classList.add('autofocus');
+                if (s.compat !== 'bad') e.querySelector('.source-badges').insertBefore(badge('★ Meilleur choix', 'best'), e.querySelector('.badge'));
+            }
             if (keep === s) refocus = e;
             list.appendChild(e);
         });
@@ -83,6 +86,27 @@ Views.streams = function (meta, video, startAt, auto) {
         App.push(Views.player({ meta: meta, video: video, stream: s, startAt: startAt || 0, sources: ranked() }));
     }
 
+    // "Lecture" / next episode: play the top-ranked source straight away (same
+    // release group first for the next episode). The list stays underneath,
+    // so Back from the player lands here to pick another one.
+    var autoTimer = null;
+    function autoPick() {
+        clearTimeout(autoTimer);
+        if (autoPlayed || !(auto.best || auto.binge) || !App.top() || App.top().el !== el) return;
+        var r = ranked();
+        var pick = null;
+        if (auto.binge) {
+            pick = r.filter(function (s) {
+                return s.raw.behaviorHints && s.raw.behaviorHints.bingeGroup === auto.binge && s.compat !== 'bad';
+            })[0] || null;
+        }
+        if (!pick && r.length) pick = r[0];
+        if (!pick) return;
+        autoPlayed = true;
+        play(pick);
+    }
+    if (auto.best || auto.binge) status.textContent = 'Recherche de la meilleure source…';
+
     API.streams(type, vid, function (addon, streams) {
         done++;
         streams.forEach(function (raw) {
@@ -91,21 +115,18 @@ Views.streams = function (meta, video, startAt, auto) {
             all.push(s);
         });
         render();
+        // A slow addon must not hold playback: decide 8 s after the first usable answer.
+        if ((auto.best || auto.binge) && !autoTimer && ranked().length) autoTimer = setTimeout(autoPick, 8000);
     }).then(function (n) {
         total = n;
         if (!n) { status.textContent = 'Aucun addon de sources installé (ex. Torrentio avec Real-Debrid).'; return; }
         render();
-        // Next episode: same release group as the previous episode, played directly.
-        if (auto.binge && !autoPlayed && App.top() && App.top().el === el) {
-            var same = ranked().filter(function (s) {
-                return s.raw.behaviorHints && s.raw.behaviorHints.bingeGroup === auto.binge;
-            })[0];
-            if (same) { autoPlayed = true; play(same); }
-        }
+        autoPick();
     });
     total = API.addons().filter(function (a) { return API.supports(a, 'stream', type, vid); }).length;
     render();
 
     // Coming back from the player: dead sources may have been detected meanwhile.
-    return { name: 'streams', el: el, onShow: function () { if (all.length) render(); } };
+    return { name: 'streams', el: el, onShow: function () { if (all.length) render(); },
+        onDestroy: function () { clearTimeout(autoTimer); } };
 };

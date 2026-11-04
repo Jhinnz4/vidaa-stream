@@ -28,7 +28,7 @@ Views.player = function (opts) {
                 playBtn,
                 h('button.btn.f', { text: 'Audio', onSelect: audioMenu }),
                 h('button.btn.f', { text: 'Sous-titres', onSelect: subsMenu }),
-                h('button.btn.f', { text: 'Sources', onSelect: function () { leave(); } }),
+                h('button.btn.f', { text: 'Sources', onSelect: sourcesMenu }),
                 nextVid ? h('button.btn.f', { text: 'Épisode suivant ▶', onSelect: playNext }) : null)));
     var errBox = h('div.player-error.hidden');
     var seekBadge = h('div.seek-badge.hidden');
@@ -58,6 +58,39 @@ Views.player = function (opts) {
     function leave() {
         save();
         App.pop();
+    }
+
+    // Switch source without leaving the player: same ranking as the list,
+    // playback resumes at the current position.
+    function switchTo(s) {
+        if (s === stream) return;
+        save();
+        var t = v.currentTime > 5 ? v.currentTime : opts.startAt;
+        App.pop();
+        App.push(Views.player({ meta: meta, video: video, stream: s, startAt: t, sources: opts.sources }));
+    }
+
+    function sourceLabel(s) {
+        var bits = [];
+        if (s.cached === true) bits.push('⚡');
+        if (s.res) bits.push(s.res);
+        bits = bits.concat(Streams.langLabel(s));
+        if (s.sizeBytes) bits.push(U.fmtSize(s.sizeBytes));
+        if (s.compat === 'bad') bits.push('⚠ ' + s.issues.join(', '));
+        return bits.join('  ·  ') || 'Source';
+    }
+
+    function sourcesMenu() {
+        var list = opts.sources.filter(function (s) { return s === stream || !Streams.isDead(s); }).slice(0, 30);
+        App.menu({
+            title: 'Changer de source',
+            note: list.length > 1 ? null : 'Pas d’autre source disponible pour ce titre.',
+            items: list.map(function (s) {
+                var t = Streams.title(s);
+                return { label: sourceLabel(s), sub: t.length > 48 ? t.slice(0, 46) + '…' : t,
+                    selected: s === stream, action: function () { switchTo(s); } };
+            }).concat([{ label: 'Voir la liste complète', action: leave }])
+        });
     }
 
     // Debrid placeholder clip (≈30 s "not available" video) instead of the film.
