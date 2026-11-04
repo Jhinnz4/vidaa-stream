@@ -8,7 +8,7 @@ const SUBS = 'https://subs.test/manifest.json';
 const addons = [
   { transportUrl: CINE, manifest: { id: 'cine', name: 'Cine', resources: ['catalog', 'meta'], types: ['movie', 'series'], idPrefixes: ['tt'],
     catalogs: [
-      { type: 'movie', id: 'top', name: 'Populaires', extra: [{ name: 'search' }, { name: 'skip' }] },
+      { type: 'movie', id: 'top', name: 'Populaires', extra: [{ name: 'search' }, { name: 'skip' }, { name: 'genre', options: ['Action', 'Drame'] }] },
       { type: 'series', id: 'top', name: 'Populaires', extra: [{ name: 'search' }, { name: 'skip' }] },
       { type: 'movie', id: 'searchonly', name: 'X', extra: [{ name: 'search', isRequired: true }] },
     ] } },
@@ -31,7 +31,7 @@ const movieStreams = [
 const SRT = '1\n00:00:00,000 --> 00:00:05,000\nBonjour <i>tout</i> le monde\n\n2\n00:00:06,000 --> 00:00:08,000\nLigne deux\n';
 
 async function mock(page, { loggedIn = true, library = [] } = {}) {
-  const calls = { catalogSearch: [], puts: [], linkReads: 0 };
+  const calls = { catalogSearch: [], catalogExtra: [], puts: [], linkReads: 0 };
   if (loggedIn) await page.addInitScript(() => localStorage.setItem('sp_authKey', JSON.stringify('KEY')));
   await page.route('https://link.stremio.com/**', (route) => {
     const u = route.request().url();
@@ -54,6 +54,7 @@ async function mock(page, { loggedIn = true, library = [] } = {}) {
     const m = u.match(/\/catalog\/(\w+)\/(\w+)(?:\/(.*))?\.json/);
     if (m) {
       const extra = m[3] || '';
+      if (extra) calls.catalogExtra.push(extra);
       if (extra.startsWith('search=')) {
         calls.catalogSearch.push(extra.slice(7));
         return route.fulfill({ json: { metas: metas(m[1], 5, extra.slice(7) + ' ') } });

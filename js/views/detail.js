@@ -7,13 +7,13 @@ Views.detail = function (type, id, preview) {
     var el = h('div.detail', null, bg, body);
     var meta = null;
     function progressSig() {
-        var it = API.libraryItem(id);
+        var it = Lib.item(id);
         return it ? JSON.stringify(it.state) : '';
     }
     var sig = progressSig();
 
     function resumeInfo(videoId) {
-        var it = API.libraryItem(id);
+        var it = Lib.item(id);
         if (!it || !it.state || !it.state.timeOffset) return null;
         if (videoId && it.state.video_id && it.state.video_id !== videoId) return null;
         return { videoId: it.state.video_id || id, time: it.state.timeOffset / 1000, duration: it.state.duration / 1000 };
@@ -39,11 +39,24 @@ Views.detail = function (type, id, preview) {
         return 'S' + v.season + ' · É' + (v.episode || v.number);
     }
 
+    function listButton() {
+        function label() { return Lib.inList(meta.id) ? '✓ Dans ma liste' : '+ Ma liste'; }
+        var b = h('button.btn.f', { text: label(), onSelect: function () {
+            var on = !Lib.inList(meta.id);
+            Lib.setInList(meta, on);
+            b.textContent = label();
+            U.toast(on ? 'Ajouté à ta liste' : 'Retiré de ta liste');
+        } });
+        return b;
+    }
+
     function render() {
-        if (meta.background) bg.style.backgroundImage = 'url("' + meta.background + '")';
+        var bgUrl = meta.background || Views.ui.art(meta.id, 'background');
+        if (bgUrl) bg.style.backgroundImage = 'url("' + bgUrl + '")';
         U.clear(body);
+        var logoUrl = meta.logo || Views.ui.art(meta.id, 'logo');
         var head = h('div.detail-head', { 'data-vanchor': '' },
-            meta.logo ? h('img.detail-logo', { src: meta.logo, alt: meta.name, onerror: function () {
+            logoUrl ? h('img.detail-logo', { src: logoUrl, alt: meta.name, onerror: function () {
                 this.replaceWith(h('h1', { text: meta.name }));
             } }) : h('h1', { text: meta.name }),
             h('p.detail-info', { text: infoLine(meta) }),
@@ -62,6 +75,7 @@ Views.detail = function (type, id, preview) {
             } else {
                 actions.appendChild(h('button.btn.primary.f.autofocus', { text: '▶ Lecture', onSelect: function () { openStreams(null, 0); } }));
             }
+            actions.appendChild(listButton());
             return;
         }
 
@@ -74,6 +88,7 @@ Views.detail = function (type, id, preview) {
                 text: '▶ Reprendre ' + epLabel(resumeVid) + (res.time > 30 ? ' à ' + U.fmtTime(res.time) : ''),
                 onSelect: function () { openStreams(resumeVid, res.time); } }));
         }
+        actions.appendChild(listButton());
         var seasons = [];
         vids.forEach(function (v) { if (seasons.indexOf(v.season) === -1) seasons.push(v.season); });
         // Specials (season 0) last.

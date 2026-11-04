@@ -162,49 +162,14 @@ var API = (function () {
         }, function () { library = library || []; return library; });
     }
 
-    function libraryItem(id) {
-        if (!library) return null;
-        for (var i = 0; i < library.length; i++) if (library[i]._id === id) return library[i];
-        return null;
-    }
-
-    function continueWatching() {
-        return (library || []).filter(function (it) {
-            var s = it.state || {};
-            return (!it.removed || it.temp) && s.timeOffset > 0 && s.lastWatched;
-        }).sort(function (a, b) {
-            return new Date(b.state.lastWatched) - new Date(a.state.lastWatched);
-        });
-    }
-
-    // Record progress. Existing items are copied as-is and only their
-    // progress fields change, so other Stremio clients keep parsing them.
-    function saveProgress(metaInfo, videoId, timeSec, durationSec) {
-        if (!authKey() || !metaInfo || !isFinite(timeSec) || !isFinite(durationSec) || durationSec <= 0) return;
-        var now = new Date().toISOString();
-        var old = libraryItem(metaInfo.id);
-        var item = old ? JSON.parse(JSON.stringify(old)) : {
-            _id: metaInfo.id, name: metaInfo.name || '', type: metaInfo.type,
-            poster: metaInfo.poster || null, posterShape: 'poster',
-            removed: true, temp: true, _ctime: now, _mtime: now,
-            state: { lastWatched: now, timeWatched: 0, timeOffset: 0, overallTimeWatched: 0,
-                timesWatched: 0, flaggedWatched: 0, duration: 0, video_id: null, watched: null, noNotif: false },
-            behaviorHints: { defaultVideoId: null, featuredVideoId: null, hasScheduledVideos: false }
-        };
-        var st = item.state || (item.state = {});
-        var watchedPart = durationSec ? timeSec / durationSec : 0;
-        st.lastWatched = now;
-        st.video_id = videoId || metaInfo.id;
-        st.duration = Math.round(durationSec * 1000);
-        if (watchedPart > 0.9) {
-            st.timeOffset = 0;                       // finished: drop out of "continue watching"
-            if (metaInfo.type === 'movie') st.flaggedWatched = 1;
-            st.timesWatched = (st.timesWatched || 0) + 1;
-        } else {
-            st.timeOffset = Math.round(timeSec * 1000);
+    // Upsert one library item locally and on the account (see library.js).
+    function libraryPut(item) {
+        if (!library) library = [];
+        for (var i = 0; i < library.length; i++) {
+            if (library[i]._id === item._id) { library[i] = item; break; }
         }
-        item._mtime = now;
-        if (old) library[library.indexOf(old)] = item; else (library || (library = [])).push(item);
+        if (i === library.length) library.push(item);
+        if (!authKey()) return Promise.resolve();
         return call('datastorePut', { collection: 'libraryItem', changes: [item] }).catch(function () {});
     }
 
@@ -225,7 +190,7 @@ var API = (function () {
         loadAddons: loadAddons, addons: function () { return addons || []; }, supports: supports,
         homeCatalogs: homeCatalogs, searchCatalogs: searchCatalogs, catalog: catalog,
         meta: meta, streams: streams, subtitles: subtitles,
-        loadLibrary: loadLibrary, libraryItem: libraryItem, continueWatching: continueWatching,
-        saveProgress: saveProgress, logout: logout
+        loadLibrary: loadLibrary, library: function () { return library || []; }, libraryPut: libraryPut,
+        logout: logout
     };
 })();

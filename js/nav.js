@@ -53,7 +53,9 @@ var Nav = (function () {
     function groupOf(el) { return el && el.parentElement ? el.parentElement.closest('[data-group]') : null; }
 
     function best(dir, from, list, strict) {
-        var a = from.getBoundingClientRect(), bestEl = null, bestScore = Infinity;
+        // _navRect lets an element navigate from a different box than it draws
+        // (the opened sidebar overlaps the content it leads to).
+        var a = from._navRect ? from._navRect() : from.getBoundingClientRect(), bestEl = null, bestScore = Infinity;
         for (var i = 0; i < list.length; i++) {
             if (list[i] === from) continue;
             var s = score(dir, a, list[i].getBoundingClientRect(), strict);
@@ -102,11 +104,13 @@ var Nav = (function () {
 
     function focus(el) {
         if (!el) return;
-        if (cur && cur !== el) {
-            cur.classList.remove('focused');
-            if (cur.tagName === 'INPUT' && document.activeElement === cur) cur.blur();
+        var prev = cur;
+        if (prev && prev !== el) {
+            prev.classList.remove('focused');
+            if (prev.tagName === 'INPUT' && document.activeElement === prev) prev.blur();
         }
         cur = el;
+        if (prev && prev !== el && prev._onBlur) prev._onBlur(prev, el);
         el.classList.add('focused');
         var g = groupOf(el);
         if (g) g._last = el;

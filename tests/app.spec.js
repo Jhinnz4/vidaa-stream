@@ -38,23 +38,119 @@ test('home: D-pad moves along rows, down/up keeps the column, left reaches the s
   expect((await focused(page)).text).toBe('Film 1');
 });
 
-test('search: slow typing keeps the input focused and queries once', async ({ page }) => {
+async function openSidebar(page, label) {
+  await key(page, 'ArrowLeft', 30);
+  await key(page, 'ArrowUp', 8);                  // top of the rail (profile)
+  for (let i = 0; i < 8 && !((await focused(page)).text === label); i++) await key(page, 'ArrowDown');
+  expect((await focused(page)).text).toBe(label);
+  await key(page, 'Enter');
+}
+
+test('search: on-screen keyboard with the D-pad, remote digits/real keys, one query per word', async ({ page }) => {
   const calls = await mock(page);
   await page.goto('/');
   await expect(page.locator('.row')).toHaveCount(2);
-  await key(page, 'ArrowLeft', 2);
-  await key(page, 'ArrowDown');
-  expect((await focused(page)).text).toBe('Recherche');
+  await openSidebar(page, 'Recherche');
+  expect((await focused(page)).text).toBe('a');
+  // D-pad typing: "m" is row 3, col 1 (a b c d e f / g h i j k l / m …).
+  await key(page, 'ArrowDown', 2);
+  expect((await focused(page)).text).toBe('m');
   await key(page, 'Enter');
-  const input = page.locator('.search-input');
-  await key(page, 'Enter');                       // OK on the field opens the keyboard
-  await page.keyboard.type('matrix', { delay: 400 });
-  expect(await page.evaluate(() => document.activeElement.className)).toContain('search-input');
-  await expect(page.locator('.search-results .row')).toHaveCount(3, { timeout: 5000 });
-  expect(await page.evaluate(() => document.activeElement.className)).toContain('search-input');
+  await key(page, 'ArrowUp', 2);
+  await key(page, 'Enter');                       // "a"
+  await expect(page.locator('.kb-text')).toHaveText('ma');
+  // The rest from a real keyboard, slowly (like remote typing).
+  await page.keyboard.type('trix', { delay: 300 });
+  await expect(page.locator('.kb-text')).toHaveText('matrix');
+  await expect(page.locator('.search-results .row')).toHaveCount(2, { timeout: 5000 });
   expect([...new Set(calls.catalogSearch)]).toEqual(['matrix']);
-  await key(page, 'ArrowDown');
+  // Right from the keyboard reaches the results; opening one remembers the search.
+  await key(page, 'ArrowRight', 6);
   expect((await focused(page)).text).toMatch(/^matrix/);
+  await key(page, 'Enter');
+  await expect(page.locator('.detail h1')).toBeVisible();
+  expect(await page.evaluate(() => Profiles.current().searches)).toEqual(['matrix']);
+});
+
+test('profiles: create one with keyboard + avatar, pick it, its progress stays separate', async ({ page }) => {
+  const calls = await mock(page);
+  await page.goto('/');
+  await expect(page.locator('.row')).toHaveCount(2);
+  await openSidebar(page, 'Moi');
+  await expect(page.locator('.profiles h1')).toHaveText('Qui regarde ?');
+  await key(page, 'ArrowRight');
+  expect((await focused(page)).text).toBe('Ajouter');
+  await key(page, 'Enter');
+  await expect(page.locator('.profile-editor h1')).toHaveText('Nouveau profil');
+  await page.keyboard.type('lea', { delay: 50 });
+  await expect(page.locator('.kb-text')).toHaveText('Lea');
+  // Avatar grid is right of the keyboard.
+  await key(page, 'ArrowRight', 7);
+  expect((await focused(page)).cls).toContain('avatar-pick');
+  await key(page, 'ArrowRight');
+  await key(page, 'Enter');
+  // Back left to the buttons.
+  await key(page, 'ArrowLeft', 12);
+  for (let i = 0; i < 10 && (await focused(page)).text !== 'Enregistrer'; i++) await key(page, 'ArrowDown');
+  expect((await focused(page)).text).toBe('Enregistrer');
+  await key(page, 'Enter');
+  await expect(page.locator('.profile-tile')).toHaveCount(3);       // Moi, Lea, Ajouter
+  await key(page, 'ArrowRight');
+  expect((await focused(page)).text).toBe('Lea');
+  await key(page, 'Enter');
+  await expect(page.locator('.row')).toHaveCount(2);
+  const p = await page.evaluate(() => Profiles.current());
+  expect(p.name).toBe('Lea');
+  expect(p.owner).toBe(false);
+  // Progress of a non-owner profile stays on the TV (no account write).
+  await page.evaluate(() => Lib.saveProgress({ id: 'tt1000003', type: 'movie', name: 'Film 4' }, 'tt1000003', 600, 6000));
+  await page.evaluate(() => App.reset(Views.home()));
+  await expect(page.locator('.row').first().locator('h3')).toHaveText('Continuer à regarder');
+  expect(calls.puts).toHaveLength(0);
+  // Back to the owner profile: no such progress there. With 2 profiles the picker shows at boot.
+  await page.reload();
+  await expect(page.locator('.profiles h1')).toHaveText('Qui regarde ?');
+  expect((await focused(page)).text).toBe('Lea');               // last used
+  await key(page, 'ArrowLeft');
+  await key(page, 'Enter');
+  await expect(page.locator('.row')).toHaveCount(2);
+  expect(await page.locator('.row h3').allTextContents()).not.toContain('Continuer à regarder');
+});
+
+test('my list: add from the detail page (synced for the owner), shown on home and in "Ma liste"', async ({ page }) => {
+  const calls = await mock(page);
+  await page.goto('/');
+  await expect(page.locator('.row')).toHaveCount(2);
+  await key(page, 'Enter');
+  await expect(page.locator('.detail h1')).toHaveText('Le Film');
+  await key(page, 'ArrowRight');
+  expect((await focused(page)).text).toBe('+ Ma liste');
+  await key(page, 'Enter');
+  expect((await focused(page)).text).toBe('✓ Dans ma liste');
+  await expect.poll(() => calls.puts.length).toBe(1);
+  expect(calls.puts[0].changes[0]).toMatchObject({ _id: 'tt1000000', removed: false, temp: false });
+  await key(page, 'Backspace');
+  await expect(page.locator('.row').first().locator('h3')).toHaveText('Ma liste');
+  await openSidebar(page, 'Ma liste');
+  await expect(page.locator('.grid .card')).toHaveCount(1);
+});
+
+test('browse: Films grid with genre filter', async ({ page }) => {
+  const calls = await mock(page);
+  await page.goto('/');
+  await expect(page.locator('.row')).toHaveCount(2);
+  await openSidebar(page, 'Films');
+  await expect(page.locator('.grid .card')).toHaveCount(20);
+  expect((await focused(page)).cls).toContain('card');            // focus enters the page
+  await expect(page.locator('.chip')).toHaveText(['Populaires', 'Tous les genres', 'Action', 'Drame']);
+  await key(page, 'ArrowUp', 3);
+  await key(page, 'ArrowRight');
+  for (let i = 0; i < 4 && (await focused(page)).text !== 'Action'; i++) await key(page, 'ArrowRight');
+  expect((await focused(page)).text).toBe('Action');
+  await key(page, 'Enter');
+  await expect.poll(() => calls.catalogExtra.includes('genre=Action')).toBe(true);
+  await key(page, 'ArrowDown', 2);
+  expect((await focused(page)).cls).toContain('card');
 });
 
 test('sources: French first, risky last and flagged, torrent-only hidden', async ({ page }) => {
@@ -167,7 +263,7 @@ test('progress is saved on an existing library item without dropping its fields'
   await expect(page.locator('.row').first().locator('h3')).toHaveText('Continuer à regarder');
   await key(page, 'Enter');
   await expect(page.locator('.btn.primary')).toHaveText('▶ Reprendre à 10:00');
-  await page.evaluate(() => API.saveProgress({ id: 'tt1000000', type: 'movie', name: 'Film 1' }, 'tt1000000', 1200, 6000));
+  await page.evaluate(() => Lib.saveProgress({ id: 'tt1000000', type: 'movie', name: 'Film 1' }, 'tt1000000', 1200, 6000));
   await expect.poll(() => calls.puts.length).toBe(1);
   const put = calls.puts[0].changes[0];
   expect(put.customField).toBe(42);

@@ -15,6 +15,8 @@ var U = (function () {
                 var v = props[k];
                 if (k === 'onSelect') el._onSelect = v;
                 else if (k === 'onFocus') el._onFocus = v;
+                else if (k === 'onBlur') el._onBlur = v;
+                else if (k === 'html') el.innerHTML = v;
                 else if (k === 'text') el.textContent = v;
                 else if (k === 'style') el.style.cssText = v;
                 else if (k.indexOf('on') === 0) el.addEventListener(k.slice(2).toLowerCase(), v);

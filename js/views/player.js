@@ -52,7 +52,7 @@ Views.player = function (opts) {
 
     function save() {
         if (!v.duration || !isFinite(v.duration) || v.currentTime < 5) return;
-        API.saveProgress(meta, videoId, v.currentTime, v.duration);
+        Lib.saveProgress(meta, videoId, v.currentTime, v.duration);
     }
 
     function leave() {

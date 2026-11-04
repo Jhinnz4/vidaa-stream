@@ -120,9 +120,12 @@ var App = (function () {
             }
             return;                                       // characters, caret moves, backspace
         }
-        if (!name) return;
-        e.preventDefault();
         var v = top();
+        if (!name) {
+            if (v && v.onRawKey && !e.ctrlKey && !e.altKey && !e.metaKey && v.onRawKey(e) === true) e.preventDefault();
+            return;
+        }
+        e.preventDefault();
         if (v && v.onKey && v.onKey(name, e) === true) return;
         if (name === 'back') { back(); return; }
         if (name === 'enter') { Nav.activate(); return; }
@@ -150,7 +153,8 @@ var App = (function () {
         API.loadAddons().then(function () {
             return API.loadLibrary();
         }).then(function () {
-            reset(Views.home());
+            // "Qui regarde ?" only once there is more than one profile.
+            reset(Profiles.list().length > 1 ? Views.profiles() : Views.home());
         }).catch(function (e) {
             if (!API.authKey()) { reset(Views.login()); return; }
             reset({ el: U.h('div.splash', null, U.h('p', { text: 'Connexion impossible : ' + e.message }),
@@ -158,16 +162,15 @@ var App = (function () {
         });
     }
 
-    function prefs() {
-        return {
-            hideBad: U.store.get('hideBad', false),
-            preferFrench: U.store.get('preferFrench', true),
-            quality: U.store.get('quality', '1080p'),
-            subsDefault: U.store.get('subsDefault', 'off')     // 'off' | 'fr'
-        };
+    function prefs() { return Profiles.prefs(); }
+
+    // Sidebar sections live one level above home: back always returns home.
+    function section(factory) {
+        while (stack.length > 1 && top().name !== 'home') pop();
+        if (factory) push(factory());
     }
 
     return { start: start, boot: boot, push: push, pop: pop, reset: reset, back: back, top: top,
-        dialog: dialog, menu: menu, prefs: prefs, exit: exit,
+        dialog: dialog, menu: menu, prefs: prefs, exit: exit, section: section,
         keyCount: function () { return keyCount; } };
 })();
