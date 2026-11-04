@@ -6,19 +6,26 @@ const focused = (page) => page.evaluate(() => {
   return el ? { cls: el.className, text: el.textContent.trim().slice(0, 60) } : null;
 });
 
+async function pick(page) {
+  await expect(page.locator('.profiles h1')).toHaveText('Qui regarde ?', { timeout: 10000 });
+  await page.keyboard.press('Enter');
+}
+async function start(page) { await page.goto('/'); await pick(page); }
+
 async function key(page, k, n = 1) { for (let i = 0; i < n; i++) { await page.keyboard.press(k); await page.waitForTimeout(60); } }
 
-test('login by code then lands on home', async ({ page }) => {
+test('login by code, then the profile picker, then home', async ({ page }) => {
   await mock(page, { loggedIn: false });
   await page.goto('/');
   await expect(page.locator('.login-code')).toHaveText('AB12');
+  await pick(page);                                     // then "Qui regarde ?"
   await expect(page.locator('.row').first()).toBeVisible({ timeout: 10000 });
   expect(await page.evaluate(() => localStorage.getItem('sp_authKey'))).toBe('"KEY"');
 });
 
 test('home: D-pad moves along rows, down/up keeps the column, left reaches the sidebar', async ({ page }) => {
   await mock(page);
-  await page.goto('/');
+  await start(page);
   await expect(page.locator('.row')).toHaveCount(2);
   await page.waitForTimeout(300);
   expect((await focused(page)).text).toBe('Film 1');
@@ -48,7 +55,7 @@ async function openSidebar(page, label) {
 
 test('search: on-screen keyboard with the D-pad, remote digits/real keys, one query per word', async ({ page }) => {
   const calls = await mock(page);
-  await page.goto('/');
+  await start(page);
   await expect(page.locator('.row')).toHaveCount(2);
   await openSidebar(page, 'Recherche');
   expect((await focused(page)).text).toBe('a');
@@ -74,7 +81,7 @@ test('search: on-screen keyboard with the D-pad, remote digits/real keys, one qu
 
 test('profiles: create one with keyboard + avatar, pick it, its progress stays separate', async ({ page }) => {
   const calls = await mock(page);
-  await page.goto('/');
+  await start(page);
   await expect(page.locator('.row')).toHaveCount(2);
   await openSidebar(page, 'Moi');
   await expect(page.locator('.profiles h1')).toHaveText('Qui regarde ?');
@@ -119,7 +126,7 @@ test('profiles: create one with keyboard + avatar, pick it, its progress stays s
 
 test('my list: add from the detail page (synced for the owner), shown on home and in "Ma liste"', async ({ page }) => {
   const calls = await mock(page);
-  await page.goto('/');
+  await start(page);
   await expect(page.locator('.row')).toHaveCount(2);
   await key(page, 'Enter');
   await expect(page.locator('.detail h1')).toHaveText('Le Film');
@@ -137,7 +144,7 @@ test('my list: add from the detail page (synced for the owner), shown on home an
 
 test('browse: Films grid with genre filter', async ({ page }) => {
   const calls = await mock(page);
-  await page.goto('/');
+  await start(page);
   await expect(page.locator('.row')).toHaveCount(2);
   await openSidebar(page, 'Films');
   await expect(page.locator('.grid .card')).toHaveCount(20);
@@ -155,7 +162,7 @@ test('browse: Films grid with genre filter', async ({ page }) => {
 
 test('sources: French first, risky last and flagged, torrent-only hidden', async ({ page }) => {
   await mock(page);
-  await page.goto('/');
+  await start(page);
   await expect(page.locator('.row')).toHaveCount(2);
   await key(page, 'Enter');
   await expect(page.locator('.detail h1')).toHaveText('Le Film');
@@ -176,7 +183,7 @@ test('sources: French first, risky last and flagged, torrent-only hidden', async
 
 test('player: unreadable file shows an error with next-source; audio menu explains the limit', async ({ page }) => {
   await mock(page);
-  await page.goto('/');
+  await start(page);
   await expect(page.locator('.row')).toHaveCount(2);
   await key(page, 'Enter');
   await expect(page.locator('.detail h1')).toHaveText('Le Film');
@@ -194,7 +201,7 @@ test('player: unreadable file shows an error with next-source; audio menu explai
 
 test('player controls: audio note, French subtitles drawn by the app', async ({ page }) => {
   await mock(page);
-  await page.goto('/');
+  await start(page);
   await expect(page.locator('.row')).toHaveCount(2);
   await key(page, 'Enter');
   await key(page, 'Enter');
@@ -234,7 +241,7 @@ test('debrid "not available" clip: skips to the next source and hides the dead o
     };
   });
   await page.route('https://media.test/**', () => {});
-  await page.goto('/');
+  await start(page);
   await expect(page.locator('.row')).toHaveCount(2);
   await key(page, 'Enter');
   await key(page, 'Enter');
@@ -259,7 +266,7 @@ test('progress is saved on an existing library item without dropping its fields'
       flaggedWatched: 0, duration: 6000000, video_id: 'tt1000000', watched: null, noNotif: false },
     behaviorHints: { defaultVideoId: null, featuredVideoId: null, hasScheduledVideos: false } };
   const calls = await mock(page, { library: [item] });
-  await page.goto('/');
+  await start(page);
   await expect(page.locator('.row').first().locator('h3')).toHaveText('Continuer à regarder');
   await key(page, 'Enter');
   await expect(page.locator('.btn.primary')).toHaveText('▶ Reprendre à 10:00');
@@ -274,7 +281,7 @@ test('progress is saved on an existing library item without dropping its fields'
 
 test('series: seasons switch episodes; next-episode uses the same release group', async ({ page }) => {
   await mock(page);
-  await page.goto('/');
+  await start(page);
   await expect(page.locator('.row')).toHaveCount(2);
   await key(page, 'ArrowDown');
   await key(page, 'Enter');

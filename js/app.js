@@ -153,8 +153,8 @@ var App = (function () {
         API.loadAddons().then(function () {
             return API.loadLibrary();
         }).then(function () {
-            // "Qui regarde ?" only once there is more than one profile.
-            reset(Profiles.list().length > 1 ? Views.profiles() : Views.home());
+            // Every launch starts on "Qui regarde ?".
+            reset(Views.profiles());
         }).catch(function (e) {
             if (!API.authKey()) { reset(Views.login()); return; }
             reset({ el: U.h('div.splash', null, U.h('p', { text: 'Connexion impossible : ' + e.message }),
