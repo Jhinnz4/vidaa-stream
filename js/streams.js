@@ -2,6 +2,7 @@
 // carries, and an order that puts "will play, in French, instantly" first.
 var Streams = (function () {
     'use strict';
+    var IS_TV = /VIDAA|Hisense|SMART-?TV|SmartTV|Tizen|Web0S|HbbTV|NetCast/i.test(navigator.userAgent);
 
     var FLAGS = {
         '🇫🇷': 'fr', '🇧🇪': 'fr', '🇨🇦': 'fr', '🇬🇧': 'en', '🇺🇸': 'en', '🇪🇸': 'es', '🇲🇽': 'es',
@@ -55,6 +56,10 @@ var Streams = (function () {
         if (/REMUX/.test(up)) info.issues.push('REMUX');
         if (/\bAV1\b/.test(up)) info.issues.push('AV1');
         if (/\b3D\b|\bHSBS\b|\bHOU\b/.test(up)) info.issues.push('3D');
+        // PC browsers (Chrome...) have no Dolby audio decoder: the picture plays, silent.
+        if (!IS_TV && /\bE-?AC-?3\b|\bAC-?3\b|\bDDP?[\s.]?[257][\s.]?[01]\b|\bDD\+|\bDDP\b|DOLBY.?DIGITAL|\bATMOS\b/.test(up)) {
+            info.issues.push('son Dolby (muet sur PC)');
+        }
         var dv = /\bDV\b|DOLBY.?VISION|\bDOVI\b/.test(up);
         var hdr = /HDR/.test(up);
         if (info.issues.length) info.compat = 'bad';
@@ -143,6 +148,6 @@ var Streams = (function () {
     function clearDead() { U.store.del(DEAD_KEY); }
     function deadCount() { return Object.keys(deadMap()).length; }
 
-    return { parse: parse, rank: rank, langLabel: langLabel, title: title,
+    return { isTV: IS_TV, parse: parse, rank: rank, langLabel: langLabel, title: title,
         markDead: markDead, isDead: isDead, clearDead: clearDead, deadCount: deadCount };
 })();

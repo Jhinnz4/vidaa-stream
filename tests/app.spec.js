@@ -305,3 +305,14 @@ test('series: seasons switch episodes; next-episode uses the same release group'
   await key(page, 'ArrowDown');
   expect((await focused(page)).text).toContain('Ep 2x1');
 });
+
+test('PC browser: Dolby-audio releases go last (silent in Chrome), not on the TV', async ({ page }) => {
+  await mock(page);
+  await page.goto('/');
+  const r = await page.evaluate(() => {
+    const a = Streams.parse({ name: '[RD+] T\n1080p', title: 'Film.MULTI.VFF.1080p.WEB.EAC3.5.1.x264', url: 'https://m/a.mkv' }, {}, 0);
+    const b = Streams.parse({ name: '[RD+] T\n1080p', title: 'Film.MULTI.VFF.1080p.WEB.AAC.x264', url: 'https://m/b.mkv' }, {}, 1);
+    return { tv: Streams.isTV, a: a.compat, b: b.compat, order: Streams.rank([a, b], { preferFrench: true, quality: '1080p' }).map((s) => s.index) };
+  });
+  expect(r).toEqual({ tv: false, a: 'bad', b: 'ok', order: [1, 0] });
+});

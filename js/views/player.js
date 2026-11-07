@@ -70,6 +70,29 @@ Views.player = function (opts) {
         App.push(Views.player({ meta: meta, video: video, stream: s, startAt: t, sources: opts.sources }));
     }
 
+    // PC browsers decode the picture but not Dolby/DTS sound: the film plays
+    // silent. Chrome/Edge expose decoded byte counters; no audio bytes while
+    // video runs = no sound -> try the next source at the same position.
+    var audioChecked = false;
+    function checkAudio() {
+        if (audioChecked || destroyed || Streams.isTV || v.paused) return;
+        if (typeof v.webkitAudioDecodedByteCount !== 'number') { audioChecked = true; return; }
+        if (v.webkitAudioDecodedByteCount > 0) { audioChecked = true; return; }
+        if (!(v.webkitVideoDecodedByteCount > 0)) return;
+        audioChecked = true;
+        stream.compat = 'bad';
+        if (stream.issues.indexOf('pas de son ici') === -1) stream.issues.push('pas de son ici');
+        var next = opts.sources.filter(function (s) {
+            return s !== stream && s.compat !== 'bad' && !Streams.isDead(s);
+        })[0];
+        if (!next) {
+            U.toast('Pas de son : ce navigateur ne lit pas l’audio de cette source. Essaie une autre source ou la TV.');
+            return;
+        }
+        U.toast('Pas de son sur ce navigateur : source suivante…');
+        switchTo(next);
+    }
+
     function sourceLabel(s) {
         var bits = [];
         if (s.cached === true) bits.push('⚡');
@@ -126,7 +149,7 @@ Views.player = function (opts) {
     if (v.audioTracks && v.audioTracks.addEventListener) v.audioTracks.addEventListener('addtrack', function () { pickFrenchAudio(); updateInfo(); });
     v.addEventListener('timeupdate', updateTime);
     v.addEventListener('progress', updateTime);
-    v.addEventListener('playing', function () { spinner.classList.add('hidden'); clearTimeout(stallTimer); playBtn.textContent = '❚❚'; });
+    v.addEventListener('playing', function () { setTimeout(checkAudio, 4000); spinner.classList.add('hidden'); clearTimeout(stallTimer); playBtn.textContent = '❚❚'; });
     v.addEventListener('pause', function () { if (destroyed) return; playBtn.textContent = '▶'; showOsd(); save(); });
     v.addEventListener('waiting', function () {
         spinner.classList.remove('hidden');
