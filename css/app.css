@@ -158,6 +158,10 @@ img { display: block; }
 .episode { display: flex; gap: 1rem; padding: 0.6rem; border-radius: 0.6rem; background: rgba(35,38,47,0.65); }
 .ep-thumb { position: relative; width: 11rem; height: 6.2rem; flex: none; border-radius: 0.4rem; overflow: hidden; background: var(--panel); }
 .ep-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.episode.watched .ep-thumb img { opacity: 0.55; }
+.ep-seen { position: absolute; top: 0.35rem; right: 0.35rem; display: flex; align-items: center; gap: 0.2rem; padding: 0.15rem 0.45rem 0.15rem 0.3rem;
+    border-radius: 1rem; background: rgba(0,0,0,0.75); color: #fff; font-size: 0.75rem; font-weight: 700; }
+.ep-seen svg { width: 0.9rem; height: 0.9rem; }
 .ep-title { font-weight: 600; margin-bottom: 0.3rem; }
 .ep-desc { color: var(--muted); font-size: 0.85rem; margin-top: 0.3rem; max-height: 2.4rem; overflow: hidden; }
 

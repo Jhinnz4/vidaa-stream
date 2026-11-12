@@ -316,3 +316,38 @@ test('PC browser: Dolby-audio releases go last (silent in Chrome), not on the TV
   });
   expect(r).toEqual({ tv: false, a: 'bad', b: 'ok', order: [1, 0] });
 });
+
+test('series: watched/in-progress episodes on thumbnails; finished episode keeps the show in "continue watching"', async ({ page }) => {
+  const item = { _id: 'tt2000000', name: 'Série 1', type: 'series', poster: null, removed: false, temp: false,
+    _ctime: '2026-01-01T00:00:00.000Z', _mtime: '2026-01-01T00:00:00.000Z', keepMe: 1,
+    state: { lastWatched: new Date().toISOString(), timeOffset: 0, duration: 1200000, video_id: 'tt2000000:1:2',
+      watched: 'tt2000000:1:2:2:eJxjBgAABAAE', timesWatched: 2 } };
+  const calls = await mock(page, { library: [item] });
+  await page.addInitScript(() => localStorage.setItem('sp_episodes_p1', JSON.stringify({ tt2000000: { 'tt2000000:1:3': [600, 1200, 0] } })));
+  await start(page);
+  // Older version had dropped it (offset 0 after finishing 1x2): it comes back on the next episode.
+  await expect(page.locator('.row').first().locator('h3').first()).toContainText('Continuer');
+  await expect(page.locator('.row').first().locator('.card').first()).toContainText('S1 · É3');
+  expect(calls.puts.some((p) => p.changes && p.changes[0].state.video_id === 'tt2000000:1:3' && p.changes[0].keepMe === 1)).toBe(true);
+  await key(page, 'Enter');
+  await expect(page.locator('.detail h1')).toHaveText('La Série');
+  await expect(page.locator('.actions .btn').first()).toHaveText('▶ Lecture S1 · É3');
+  const eps = page.locator('.episode');
+  await expect(eps).toHaveCount(3);
+  await expect(eps.nth(0).locator('.ep-seen')).toBeVisible();
+  await expect(eps.nth(1).locator('.ep-seen')).toBeVisible();
+  await expect(eps.nth(2).locator('.ep-seen')).toHaveCount(0);
+  await expect(eps.nth(2).locator('.card-progress div')).toHaveAttribute('style', /width: ?50%/);
+  await expect(eps.nth(2)).toContainText('Reprendre à 10:00');
+  // Finishing the last episode of season 1 moves the show to S2E1 instead of dropping it.
+  const st = await page.evaluate(() => {
+    const meta = { id: 'tt2000000', type: 'series', name: 'Série 1', videos: [1, 2, 3].map((e) => ({ id: 'tt2000000:1:' + e, season: 1, episode: e }))
+      .concat([{ id: 'tt2000000:2:1', season: 2, episode: 1 }]) };
+    Lib.saveProgress(meta, 'tt2000000:1:3', 1150, 1200);
+    return { s: Lib.item('tt2000000').state, ep: Lib.episodeState(meta, 'tt2000000:1:3'), cw: Lib.continueWatching().length };
+  });
+  expect(st.s.video_id).toBe('tt2000000:2:1');
+  expect(st.s.timeOffset).toBe(1);
+  expect(st.ep.watched).toBe(true);
+  expect(st.cw).toBe(1);
+});

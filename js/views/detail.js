@@ -14,7 +14,7 @@ Views.detail = function (type, id, preview) {
 
     function resumeInfo(videoId) {
         var it = Lib.item(id);
-        if (!it || !it.state || !it.state.timeOffset) return null;
+        if (!it || !it.state || !(it.state.timeOffset > 0)) return null;
         if (videoId && it.state.video_id && it.state.video_id !== videoId) return null;
         return { videoId: it.state.video_id || id, time: it.state.timeOffset / 1000, duration: it.state.duration / 1000 };
     }
@@ -91,7 +91,7 @@ Views.detail = function (type, id, preview) {
         var resumeVid = res && vids.filter(function (v) { return v.id === res.videoId; })[0];
         if (resumeVid) {
             actions.appendChild(h('button.btn.primary.f.autofocus', {
-                text: '▶ Reprendre ' + epLabel(resumeVid) + (res.time > 30 ? ' à ' + U.fmtTime(res.time) : ''),
+                text: (res.time > 30 ? '▶ Reprendre ' : '▶ Lecture ') + epLabel(resumeVid) + (res.time > 30 ? ' à ' + U.fmtTime(res.time) : ''),
                 onSelect: function () { openStreams(resumeVid, res.time); } }));
             actions.appendChild(chooseButton(resumeVid, res.time));
         }
@@ -109,16 +109,18 @@ Views.detail = function (type, id, preview) {
             Object.keys(seasonBtns).forEach(function (k) { seasonBtns[k].classList.toggle('selected', String(s) === k); });
             U.clear(epList);
             vids.filter(function (v) { return v.season === s; }).forEach(function (v) {
-                var r = resumeInfo(v.id);
-                var watchedPart = r && r.duration ? r.time / r.duration : 0;
-                epList.appendChild(h('div.episode.f', { 'data-vanchor': '', onSelect: function () {
-                    openStreams(v, r ? r.time : 0);
+                var es = Lib.episodeState(meta, v.id);
+                var resumeAt = !es.watched && es.time > 30 ? es.time : 0;
+                epList.appendChild(h('div.episode.f' + (es.watched ? '.watched' : ''), { 'data-vanchor': '', onSelect: function () {
+                    openStreams(v, resumeAt);
                 } },
                 h('div.ep-thumb', null, Views.ui.poster(v.thumbnail),
-                    watchedPart ? h('div.card-progress', null, h('div', { style: 'width:' + Math.round(watchedPart * 100) + '%' })) : null),
+                    es.watched ? h('div.ep-seen', { html: Icons.check + '<span>Vu</span>' }) : null,
+                    es.progress > 0.01 ? h('div.card-progress', null, h('div', { style: 'width:' + Math.round(es.progress * 100) + '%' })) : null),
                 h('div.ep-text', null,
                     h('div.ep-title', { text: (v.episode || v.number) + '. ' + (v.title || v.name || 'Épisode') }),
-                    v.released ? h('div.muted', { text: new Date(v.released).toLocaleDateString('fr-FR') }) : null,
+                    h('div.muted', { text: [v.released ? new Date(v.released).toLocaleDateString('fr-FR') : '',
+                        es.watched ? 'Vu' : (resumeAt ? 'Reprendre à ' + U.fmtTime(resumeAt) : '')].filter(Boolean).join('  ·  ') }),
                     v.overview || v.description ? h('div.ep-desc', { text: v.overview || v.description }) : null)));
             });
         }
@@ -139,6 +141,9 @@ Views.detail = function (type, id, preview) {
         meta = m;
         if (!meta.type) meta.type = type;
         if (!meta.id) meta.id = id;
+        // Episodes already marked watched in Stremio (other devices): decode first.
+        return Lib.loadWatched(meta);
+    }).then(function () {
         render();
         if (App.top() && App.top().el === el) Nav.focusFirst(el);
     }, function (e) {

@@ -158,7 +158,7 @@ Views.home = function () {
     }
 
     function libSig() {
-        return Lib.continueWatching().slice(0, 20).map(function (it) { return it._id + '@' + it.state.timeOffset; }).join('|')
+        return Lib.continueWatching().slice(0, 20).map(function (it) { return it._id + '@' + it.state.video_id + '@' + it.state.timeOffset; }).join('|')
             + '#' + Lib.myList().map(function (it) { return it._id; }).join('|');
     }
 
@@ -193,15 +193,22 @@ Views.home = function () {
     var firstCard = rows.querySelector('.card.f');
     if (firstCard) firstCard.classList.add('autofocus');
 
-    return {
-        name: 'home', el: el,
-        onShow: function () {
-            // Refresh library rows only when they changed (keeps focus otherwise).
-            var s = libSig();
-            if (s === sig) return;
-            sig = s;
-            U.clear(libBox);
-            libRows().forEach(function (r) { libBox.appendChild(r); });
+    // Refresh library rows only when they changed (keeps focus otherwise).
+    function refreshLib(onShow) {
+        var s = libSig();
+        if (s === sig) return;
+        var cur = Nav.current();
+        if (!onShow && cur && libBox.contains(cur) && App.keyCount() !== keysAtStart) return;   // user is in there: next onShow
+        sig = s;
+        U.clear(libBox);
+        libRows().forEach(function (r) { libBox.appendChild(r); });
+        if (App.keyCount() === keysAtStart && App.top() && App.top().el === el) {
+            var first = rows.querySelector('.card.f');
+            if (first) Nav.focus(first);
         }
-    };
+    }
+    // Series that dropped out of "continue watching" after a finished episode come back.
+    Lib.repairContinue().then(function () { refreshLib(false); });
+
+    return { name: 'home', el: el, onShow: function () { refreshLib(true); } };
 };
