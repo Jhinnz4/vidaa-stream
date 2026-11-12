@@ -1,0 +1,13 @@
+{
+  "appId": "io.github.jhinnz4.streamplus",
+  "appName": "Stream+",
+  "webDir": "www",
+  "backgroundColor": "#0b0c10",
+  "server": {
+    "url": "https://jhinnz4.github.io/vidaa-stream/",
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}

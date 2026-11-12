@@ -16,7 +16,16 @@ var Keyboard = function (opts) {
         ? ['abcdef', 'ghijkl', 'mnopqr', 'stuvwx', 'yz1234', '567890', 'éèàç-\'']
         : ['abcdef', 'ghijkl', 'mnopqr', 'stuvwx', 'yz1234', '567890'];
 
-    function render() {
+    var input = h('input.kb-input.f', { type: 'search', placeholder: opts.placeholder || '', maxlength: String(max),
+        autocomplete: 'off', autocorrect: 'off', spellcheck: 'false', oninput: function () {
+            value = input.value.slice(0, max);
+            if (opts.onChange) opts.onChange(value);
+            render(true);
+        } });
+    input._onSubmit = function () {};
+
+    function render(fromInput) {
+        if (!fromInput && input.value !== value) input.value = value;
         text.textContent = value;
         display.classList.toggle('empty', !value);
         if (!value) text.textContent = opts.placeholder || '';
@@ -47,11 +56,11 @@ var Keyboard = function (opts) {
     });
     grid.appendChild(key('Tout effacer', 'full', function () { value = ''; emit(); }));
 
-    var el = h('div.kb', null, display, grid);
+    var el = h('div.kb', null, input, display, grid);
     render();
 
     return {
-        el: el,
+        el: el, input: input,
         value: function () { return value; },
         set: function (v) { value = v || ''; emit(); },
         // Physical keys: letters/digits from a real keyboard or the remote's number pad.

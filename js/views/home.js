@@ -38,9 +38,13 @@ Views.ui = (function () {
     }
 
     function row(title, cards) {
-        return h('section.row', { 'data-vanchor': '' },
-            h('h3', { text: title }),
-            h('div.row-items.sx', { 'data-group': '' }, cards));
+        var items = h('div.row-items.sx', { 'data-group': '' }, cards);
+        function arrow(dir) {
+            var a = h('div.row-arrow.tap.' + (dir < 0 ? 'prev' : 'next'), { text: dir < 0 ? '‹' : '›' });
+            a._onTap = function () { items.scrollBy({ left: dir * items.clientWidth * 0.8, behavior: 'smooth' }); };
+            return a;
+        }
+        return h('section.row', { 'data-vanchor': '' }, h('h3', { text: title }), items, arrow(-1), arrow(1));
     }
 
     function grid(cards) { return h('div.grid', { 'data-group': '' }, cards); }

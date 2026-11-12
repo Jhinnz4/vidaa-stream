@@ -5,7 +5,7 @@
 var Nav = (function () {
     'use strict';
 
-    var cur = null, prevFocus = null;
+    var cur = null, prevFocus = null, ring = true;
     var rootFn = function () { return document.body; };
 
     function visible(el) {
@@ -122,7 +122,8 @@ var Nav = (function () {
         }
     }
 
-    function focus(el) {
+    // opts.noScroll: pointer focus (hover / tap) must not scroll the page.
+    function focus(el, opts) {
         if (!el) return;
         var prev = cur;
         if (prev !== el) prevFocus = prev;
@@ -132,10 +133,10 @@ var Nav = (function () {
         }
         cur = el;
         if (prev && prev !== el && prev._onBlur) prev._onBlur(prev, el);
-        el.classList.add('focused');
+        if (ring) el.classList.add('focused');
         var g = groupOf(el);
         if (g) g._last = el;
-        ensureVisible(el);
+        if (!(opts && opts.noScroll)) ensureVisible(el);
         if (el._onFocus) el._onFocus(el);
     }
 
@@ -160,6 +161,13 @@ var Nav = (function () {
         move: move, focus: focus, focusFirst: focusFirst, activate: activate,
         current: function () { return cur; },
         previous: function () { return prevFocus; },
-        remember: function (root) { if (root && cur && root.contains(cur)) root._lastFocus = cur; }
+        remember: function (root) { if (root && cur && root.contains(cur)) root._lastFocus = cur; },
+        // Touch mode draws no focus ring; the remote / keyboard brings it back.
+        setRing: function (on) {
+            ring = on;
+            var all = document.querySelectorAll('.focused');
+            for (var i = 0; i < all.length; i++) if (!on || all[i] !== cur) all[i].classList.remove('focused');
+            if (on && cur) cur.classList.add('focused');
+        }
     };
 })();

@@ -13,6 +13,18 @@ Views.player = function (opts) {
     var spinner = h('div.spinner.player-spinner');
     var fill = h('div.progress-fill'), buf = h('div.progress-buf'), knob = h('div.progress-knob');
     var progress = h('div.progress.f', { onSelect: function () { togglePlay(); } }, buf, fill, knob);
+    progress._onPoint = function (e) {
+        var r = progress.getBoundingClientRect();
+        if (!v.duration || !isFinite(v.duration) || !r.width) return;
+        v.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * v.duration;
+        updateTime();
+        bumpHide();
+    };
+    var bigPlay = h('button.btn.f.big-play', { text: '❚❚', onSelect: function () { togglePlay(); bumpHide(); } });
+    function jumpBtn(d) {
+        return h('button.btn.f.big-jump', { text: (d < 0 ? '« ' : '') + Math.abs(d) + ' s' + (d > 0 ? ' »' : ''),
+            onSelect: function () { jump(d); } });
+    }
     var tCur = h('span', { text: '0:00' }), tDur = h('span', { text: '0:00' });
     var playBtn = h('button.btn.f', { text: '❚❚', onSelect: togglePlay });
     var info = h('div.osd-info.muted');
@@ -21,7 +33,10 @@ Views.player = function (opts) {
         h('div.osd-top', null,
             h('div', null, h('div.osd-title', { text: meta.name }),
                 video ? h('div.muted', { text: 'S' + video.season + ' · É' + (video.episode || video.number) + '  ' + (video.title || video.name || '') }) : null),
-            info),
+            h('div.osd-right', null, info,
+                h('button.btn.small.f.pointer-only', { text: '⛶', title: 'Plein écran', onSelect: toggleFullscreen }),
+                h('button.btn.small.f.pointer-only', { text: '✕', title: 'Fermer', onSelect: function () { leave(); } }))),
+        h('div.osd-center.pointer-only', null, jumpBtn(-10), bigPlay, jumpBtn(10)),
         h('div.osd-bottom', null,
             h('div.osd-times', null, tCur, progress, tDur),
             h('div.osd-buttons', { 'data-group': '' },
@@ -123,6 +138,59 @@ Views.player = function (opts) {
     }
 
     function togglePlay() { if (v.paused) v.play().catch(function () {}); else v.pause(); }
+    function jump(d) {
+        if (!v.duration || !isFinite(v.duration)) return;
+        v.currentTime = Math.max(0, Math.min(v.duration - 1, v.currentTime + d));
+        seekBadge.textContent = (d > 0 ? '» ' : '« ') + U.fmtTime(v.currentTime);
+        seekBadge.classList.remove('hidden');
+        clearTimeout(seekTimer);
+        seekTimer = setTimeout(function () { seekBadge.classList.add('hidden'); }, 700);
+        updateTime();
+        bumpHide();
+    }
+    function toggleFullscreen() {
+        var d = document;
+        try {
+            if (d.fullscreenElement) d.exitFullscreen();
+            else if (d.documentElement.requestFullscreen) d.documentElement.requestFullscreen();
+        } catch (e) {}
+    }
+    // Keep the screen on while playing (phones / PCs).
+    var wakeLock = null;
+    function keepAwake(on) {
+        var ka = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.KeepAwake;
+        if (ka) { (on ? ka.keepAwake() : ka.allowSleep()).catch(function () {}); return; }
+        if (on && !wakeLock && navigator.wakeLock) {
+            navigator.wakeLock.request('screen').then(function (l) { wakeLock = l; if (destroyed) l.release(); }, function () {});
+        } else if (!on && wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
+    }
+    // Tap: touch shows/hides the controls, a mouse click plays/pauses;
+    // double tap on a side jumps 10 s, double click goes full screen.
+    var tapTimer = null, lastTap = 0;
+    function onTap(e) {
+        if (!errBox.classList.contains('hidden')) return;
+        var touch = document.documentElement.classList.contains('touch');
+        var now = Date.now(), dbl = now - lastTap < 300;
+        lastTap = dbl ? 0 : now;
+        clearTimeout(tapTimer);
+        if (dbl) {
+            if (!touch) { toggleFullscreen(); return; }
+            var x = e.clientX / window.innerWidth;
+            if (x < 0.35) jump(-10); else if (x > 0.65) jump(10); else toggleFullscreen();
+            return;
+        }
+        tapTimer = setTimeout(function () {
+            if (touch) { if (osdVisible()) hideOsd(); else showOsd(); }
+            else { togglePlay(); showOsd(); }
+        }, 260);
+    }
+    var lastMove = 0;
+    el.addEventListener('mousemove', function () {
+        var now = Date.now();
+        if (now - lastMove < 300 || !document.documentElement.classList.contains('mouse')) return;
+        lastMove = now;
+        if (osdVisible()) bumpHide(); else showOsd();
+    });
 
     function save() {
         if (!v.duration || !isFinite(v.duration) || v.currentTime < 5) return;
@@ -224,8 +292,8 @@ Views.player = function (opts) {
     v.addEventListener('timeupdate', updateTime);
     v.addEventListener('timeupdate', checkSegments);
     v.addEventListener('progress', updateTime);
-    v.addEventListener('playing', function () { setTimeout(checkAudio, 4000); spinner.classList.add('hidden'); clearTimeout(stallTimer); playBtn.textContent = '❚❚'; });
-    v.addEventListener('pause', function () { if (destroyed) return; playBtn.textContent = '▶'; showOsd(); save(); });
+    v.addEventListener('playing', function () { setTimeout(checkAudio, 4000); spinner.classList.add('hidden'); clearTimeout(stallTimer); playBtn.textContent = bigPlay.textContent = '❚❚'; keepAwake(true); });
+    v.addEventListener('pause', function () { if (destroyed) return; playBtn.textContent = bigPlay.textContent = '▶'; keepAwake(false); showOsd(); save(); });
     v.addEventListener('waiting', function () {
         spinner.classList.remove('hidden');
         clearTimeout(stallTimer);
@@ -237,7 +305,7 @@ Views.player = function (opts) {
         var msg = {
             2: 'Erreur réseau pendant la lecture.',
             3: 'La TV n’arrive pas à décoder cette vidéo (codec non pris en charge).',
-            4: 'Format non pris en charge par la TV.'
+            4: 'Format non pris en charge par cet appareil.'
         }[code] || 'Lecture impossible.';
         if (stream.issues.length) msg += ' Cette source contient : ' + stream.issues.join(', ') + '.';
         showError(msg);
@@ -341,7 +409,7 @@ Views.player = function (opts) {
             })(i);
             if (at.length === 1) note = 'La TV ne voit qu’une piste audio dans ce fichier.';
         } else {
-            note = 'Le navigateur de la TV ne permet pas de changer la piste audio : il lit la piste par défaut du fichier.';
+            note = 'Ce navigateur ne permet pas de changer la piste audio : il lit la piste par défaut du fichier.';
         }
         if (note) {
             note += ' Pour être sûr d’avoir le français, choisis une source marquée VF.';
@@ -446,7 +514,7 @@ Views.player = function (opts) {
     }
 
     var view = {
-        name: 'player', el: el,
+        name: 'player', el: el, onTap: onTap,
         onKey: function (k) {
             if (!errBox.classList.contains('hidden')) {
                 if (k === 'back') { leave(); return true; }
@@ -477,7 +545,9 @@ Views.player = function (opts) {
         onShow: function () { if (v.paused && v.currentTime > 0) showOsd(); },
         onDestroy: function () {
             destroyed = true;
-            [hideTimer, seekTimer, stallTimer].forEach(clearTimeout);
+            keepAwake(false);
+            try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
+            [hideTimer, seekTimer, stallTimer, tapTimer].forEach(clearTimeout);
             [saveTimer, subsTimer, countdown].forEach(clearInterval);
             try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {}
         }

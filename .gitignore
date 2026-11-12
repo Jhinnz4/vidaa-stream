@@ -1,3 +1,8 @@
 node_modules/
 test-results/
 playwright-report/
+apps/android/android/
+apps/android/StreamPlus.apk
+apps/desktop/dist/
+apps/desktop/icon.png
+apps/android/*.idsig

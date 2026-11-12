@@ -65,7 +65,7 @@ Views.profileEdit = function (profile) {
         h('button.btn.f', { text: 'Annuler', onSelect: function () { App.pop(); } }),
         !isNew && !profile.owner ? h('button.btn.danger.f', { text: 'Supprimer', onSelect: function () {
             App.dialog({ title: 'Supprimer « ' + profile.name + ' » ?',
-                text: 'Sa progression et sa liste seront effacées de la TV.',
+                text: 'Sa progression et sa liste seront effacées de cet appareil.',
                 buttons: [{ label: 'Supprimer', action: function () { Profiles.remove(profile.id); App.pop(); } },
                     { label: 'Annuler', autofocus: true }] });
         } }) : null);

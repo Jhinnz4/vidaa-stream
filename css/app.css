@@ -255,3 +255,114 @@ img { display: block; }
 .home-edit-row { display: flex; align-items: center; gap: 0.6rem; }
 .home-edit-row .setting { flex: 1; }
 .home-edit-row.off .setting-label { color: var(--muted); text-decoration: line-through; }
+
+/* ── Mouse & touch (PC, phone, Android app). The TV stays in "key" mode. ── */
+.kb-input, .pointer-only, .row-arrow, .fab-back { display: none; }
+html.pointer .pointer-only { display: inline-block; }
+html.pointer .osd-center.pointer-only { display: flex; }
+html.pointer, html.pointer body { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+html.pointer .f, html.pointer .tap { cursor: pointer; user-select: none; -webkit-user-select: none; }
+html.pointer .sx { overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+html.pointer .sy { overflow-y: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+html.pointer .sx::-webkit-scrollbar, html.pointer .sy::-webkit-scrollbar { display: none; }
+html.pointer .rows { min-height: 0; }
+html.mouse .sy { scrollbar-width: thin; scrollbar-color: #3b3f50 transparent; }
+html.mouse .sy::-webkit-scrollbar { display: block; width: 0.5rem; }
+html.mouse .sy::-webkit-scrollbar-thumb { background: #3b3f50; border-radius: 0.25rem; }
+html.touch .sidebar.open { width: var(--rail); box-shadow: none; background: linear-gradient(90deg, rgba(11,12,16,0.98), rgba(11,12,16,0.85)); }
+html.touch .sidebar.open .side-label { opacity: 0; }
+html.touch .card.focused, html.touch .profile-tile.focused { transform: none; }
+
+/* Text field instead of the D-pad keyboard */
+html.pointer .kb-input { display: block; width: 100%; height: 3.2rem; padding: 0 1rem; margin-bottom: 0.9rem; border-radius: 0.5rem;
+    border: 0.12rem solid transparent; background: var(--panel); color: var(--text); font: inherit; font-size: 1.2rem; outline: none; }
+html.pointer .kb-input:focus { border-color: var(--accent); }
+html.pointer .kb-display, html.pointer .kb-grid { display: none; }
+
+/* Row arrows (mouse) */
+.row { position: relative; }
+html.mouse .row-arrow { display: flex; align-items: center; justify-content: center; position: absolute; top: 2.1rem; height: 12.9rem; width: 2.6rem;
+    font-size: 2.4rem; color: #fff; background: rgba(11,12,16,0.7); opacity: 0; transition: opacity 0.15s; z-index: 2; border-radius: 0.5rem; }
+html.mouse .row:hover .row-arrow { opacity: 1; }
+.row-arrow.prev { left: 0; }
+.row-arrow.next { right: 0.4rem; }
+
+/* Back button where there is no menu */
+html.pointer .fab-back { display: flex; align-items: center; justify-content: center; position: fixed; z-index: 40; top: 0.8rem; left: 0.8rem;
+    width: 2.8rem; height: 2.8rem; border-radius: 50%; background: rgba(35,38,47,0.9); color: #fff; font-size: 2rem; line-height: 1; padding-bottom: 0.25rem; }
+html.pointer .fab-back.hidden { display: none !important; }
+html.pointer .page { padding-top: 4rem; }
+html.pointer .detail-body { padding-top: 4.4rem; }
+
+/* Player: big touch controls */
+.osd-right { display: flex; align-items: flex-start; gap: 0.6rem; }
+.osd-right .osd-info { margin: 0.5rem 0.6rem 0 0; }
+.osd-right .btn { margin: 0; }
+.osd-center { align-items: center; justify-content: center; gap: 2.4rem; }
+.big-play { width: 5rem; height: 5rem; border-radius: 50%; font-size: 1.8rem; padding: 0; margin: 0; background: rgba(35,38,47,0.85); }
+.big-jump { border-radius: 2rem; background: rgba(35,38,47,0.85); margin: 0; }
+html.pointer .progress { height: 0.6rem; }
+html.pointer .progress::before { content: ''; position: absolute; left: 0; right: 0; top: -1rem; bottom: -1rem; }
+html.pointer .progress-knob { display: block; }
+html.touch .btn.focused, html.touch .chip.focused { background: var(--panel2); color: inherit; }
+html.touch .btn.primary.focused { background: var(--accent); color: #fff; }
+
+/* ── Phones ── */
+html.phone .detail-body { padding: 4.4rem 1.2rem 2rem; background: linear-gradient(180deg, rgba(11,12,16,0.35), var(--bg) 16rem); }
+html.phone .detail-bg { width: 100%; height: 18rem; }
+html.phone .detail-head h1 { font-size: 1.9rem; }
+html.phone .detail-logo { max-width: 70%; max-height: 5rem; }
+html.phone .detail-desc { max-height: none; }
+html.phone .btn { margin-right: 0.5rem; }
+html.phone .ep-row { flex-wrap: wrap; gap: 0.4rem; }
+html.phone .ep-row .episode { flex-basis: 100%; }
+html.phone .ep-mark { margin-left: auto; }
+html.phone .ep-thumb { width: 8.5rem; height: 4.8rem; }
+html.phone .page { padding-left: 1rem; padding-right: 1rem; }
+html.phone .page-head { flex-wrap: wrap; }
+html.phone .page-head h2 { white-space: normal; font-size: 1.2rem; }
+html.phone .dialog, html.phone .menu { max-width: 92vw; min-width: 0; padding: 1.4rem; }
+html.phone .menu { max-height: 80vh; }
+html.phone .hero { height: 15rem; }
+html.phone .hero-bg { width: 100%; }
+html.phone .hero-text { padding: 1.6rem 1rem 0; }
+html.phone .hero-title { font-size: 1.8rem; }
+html.phone .hero-logo { max-width: 60%; max-height: 4.5rem; }
+html.phone .hero-desc { display: none; }
+html.phone .rows { padding-left: 0.6rem; }
+html.phone .search-left { width: 100%; }
+html.phone .content.search { flex-direction: column; gap: 0.5rem; padding: 1rem 1rem 0; }
+html.phone .search-results { min-height: 0; }
+html.phone .grid { grid-template-columns: repeat(auto-fill, minmax(6.8rem, 1fr)); gap: 1rem 0.7rem; }
+html.phone .grid .card, html.phone .grid .card-img { width: 100%; }
+html.phone .grid .card-img { height: auto; aspect-ratio: 2 / 3; }
+html.phone .profiles h1 { font-size: 1.9rem; }
+html.phone .profile-tiles { flex-wrap: wrap; justify-content: center; gap: 1.2rem; padding: 0 1rem; }
+html.phone .profile-tile, html.phone .profile-pic { width: 7rem; }
+html.phone .profile-pic { height: 7rem; }
+html.phone .profile-editor { flex-direction: column; gap: 1.2rem; padding: 4.4rem 1.2rem 2rem; overflow-y: auto; }
+html.phone .pe-left, html.phone .pe-mid { width: 100%; }
+html.phone .login-row { flex-direction: column; gap: 1rem; }
+html.phone .login-code { font-size: 3rem; }
+html.phone .osd-top, html.phone .osd-bottom { padding-left: 1rem; padding-right: 1rem; }
+html.phone .osd-top { padding-top: 1rem; }
+html.phone .osd-title { font-size: 1.2rem; }
+html.phone .osd-info { display: none; }
+html.phone .osd-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem 0; }
+html.phone .player-subs { font-size: 1.4rem; left: 4%; right: 4%; }
+html.phone .skip-box, html.phone .next-box { right: 1rem; bottom: 8rem; }
+html.phone .next-box { width: auto; left: 1rem; }
+
+/* Portrait phone: the menu becomes a bottom tab bar */
+html.portrait .sidebar { top: auto; right: 0; height: calc(3.8rem + env(safe-area-inset-bottom)); width: auto; padding: 0.3rem 0.4rem env(safe-area-inset-bottom);
+    flex-direction: row; align-items: center; justify-content: space-around; background: rgba(11,12,16,0.97); box-shadow: 0 -0.1rem 0 #23262f; }
+html.portrait .sidebar.open { width: auto; box-shadow: 0 -0.1rem 0 #23262f; }
+html.portrait .side-items { flex-direction: row; flex: 1; justify-content: space-around; gap: 0; }
+html.portrait .side-item { height: 3rem; padding: 0 0.6rem; }
+html.portrait .side-label, html.portrait .sidebar.open .side-label { display: none; }
+html.portrait .content { left: 0; bottom: calc(3.8rem + env(safe-area-inset-bottom)); padding-left: 1rem; }
+html.portrait .content.home { padding: 0; }
+html.portrait .browse-body { left: 1rem; right: 1rem; }
+html.portrait .toast { bottom: 5.5rem; max-width: 90vw; text-align: center; }
+html.portrait .osd-center { gap: 1.4rem; }
+html.phone .seasons .btn { white-space: nowrap; }

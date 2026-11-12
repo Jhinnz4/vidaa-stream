@@ -68,6 +68,7 @@ Views.search = function (initial) {
     var debounced = U.debounce(run, 600);
     showRecent();
     if (initial) { kb.set(initial); run(initial); }
+    else if (document.documentElement.classList.contains('touch')) setTimeout(function () { kb.input.focus(); }, 350);
 
     return {
         name: 'search', el: el,

@@ -1,0 +1,24 @@
+{
+  "name": "stream-plus",
+  "productName": "Stream+",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Stream+ pour PC",
+  "author": "Jhinnz4",
+  "main": "main.js",
+  "scripts": {
+    "build": "copy ..\\..\\icon.png icon.png && electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "io.github.jhinnz4.streamplus",
+    "productName": "Stream+",
+    "files": ["main.js", "icon.png"],
+    "win": { "target": ["nsis", "portable"], "icon": "icon.png" },
+    "nsis": { "oneClick": true, "artifactName": "StreamPlus-Setup.${ext}" },
+    "portable": { "artifactName": "StreamPlus-Portable.${ext}" }
+  }
+}

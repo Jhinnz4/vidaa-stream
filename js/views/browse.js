@@ -86,6 +86,10 @@ Views.browse = function (type) {
         more();
     }
 
+    body.addEventListener('scroll', function () {
+        if (body.scrollTop + body.clientHeight > body.scrollHeight - 600) more();
+    });
+
     if (cats.length) { cur = cats[0]; reload(); }
     else status.textContent = 'Aucun catalogue de ' + (type === 'movie' ? 'films' : 'séries') + ' dans tes addons.';
 

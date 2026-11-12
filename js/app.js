@@ -29,6 +29,7 @@ var App = (function () {
         stack.push(view);
         if (view.onShow) view.onShow();
         Nav.focusFirst(view.el);
+        changed();
         return view;
     }
 
@@ -43,7 +44,9 @@ var App = (function () {
             if (prev.onShow) prev.onShow();
             Nav.focusFirst(prev.el);
         }
+        changed();
     }
+    function changed() { if (window.Pointer) Pointer.update(); }
 
     // Replace the whole stack (login → home, logout → login).
     function reset(view) {
@@ -66,6 +69,8 @@ var App = (function () {
     }
 
     function exit() {
+        var cap = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.App;
+        if (cap) { cap.exitApp(); return; }
         try { window.close(); } catch (e) {}
         setTimeout(function () { try { history.go(-(history.length - 1)); } catch (e) {} }, 300);
     }
@@ -134,7 +139,15 @@ var App = (function () {
 
     function scale() {
         // 1rem = 1/54 of the screen height (20px on a 1080p viewport).
-        document.documentElement.style.fontSize = (window.innerHeight / 54) + 'px';
+        // Phones: sized on the short side instead, with a readable minimum.
+        var w = window.innerWidth, hgt = window.innerHeight, root = document.documentElement;
+        var phone = !Streams.isTV && Math.min(w, hgt) < 600;
+        var px = hgt / 54;
+        if (phone) px = Math.max(13, Math.min(17, Math.min(w, hgt) / 26));
+        else if (!Streams.isTV) px = Math.max(12, Math.min(px, w / 64));
+        root.style.fontSize = px + 'px';
+        root.classList.toggle('phone', phone);
+        root.classList.toggle('portrait', phone && hgt > w);
     }
 
     function start() {
@@ -171,6 +184,7 @@ var App = (function () {
     }
 
     return { start: start, boot: boot, push: push, pop: pop, reset: reset, back: back, top: top,
+        depth: function () { return stack.length; },
         dialog: dialog, menu: menu, prefs: prefs, exit: exit, section: section,
         keyCount: function () { return keyCount; } };
 })();
