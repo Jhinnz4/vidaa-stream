@@ -34,9 +34,11 @@ function run(cmd, cwd) {
 }
 
 // 1. Android project (generated, not committed) + icons.
-if (!fs.existsSync(path.join(here, 'android'))) run('npx cap add android');
+// Capacitor's CLI run with this Node directly (npx is not always on the PATH).
+const cap = JSON.stringify(process.execPath) + ' ' + JSON.stringify(path.join(here, 'node_modules', '@capacitor', 'cli', 'bin', 'capacitor'));
+if (!fs.existsSync(path.join(here, 'android'))) run(cap + ' add android');
 fs.cpSync(path.join(here, 'res'), path.join(here, 'android', 'app', 'src', 'main', 'res'), { recursive: true });
-run('npx cap sync android');
+run(cap + ' sync android');
 
 // 2. Release build.
 if (!process.env.SKIP_GRADLE) run((win ? 'gradlew.bat'.replace(/^/, '.' + path.sep) : './gradlew') + ' assembleRelease --no-daemon', path.join(here, 'android'));
