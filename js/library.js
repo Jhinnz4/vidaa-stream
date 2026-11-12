@@ -132,14 +132,18 @@ var Lib = (function () {
         return out;
     }
     function decodeWatched(str, videoIds) {
-        if (typeof DecompressionStream === 'undefined' || typeof Response === 'undefined') return Promise.resolve({});
         var parts = String(str).split(':');
         if (parts.length < 3) return Promise.resolve({});
         var b64 = parts.pop(), len = parseInt(parts.pop(), 10), anchor = parts.join(':');
         var anchorIdx = videoIds.indexOf(anchor);
         if (anchorIdx < 0 || !(len > 0)) return Promise.resolve({});
-        var stream = new Blob([b64bytes(b64)]).stream().pipeThrough(new DecompressionStream('deflate'));
-        return new Response(stream).arrayBuffer().then(function (buf) {
+        // The TV browser may lack DecompressionStream: pako (vendored) does the same.
+        var inflated;
+        if (typeof pako !== 'undefined') inflated = Promise.resolve(pako.inflate(b64bytes(b64)).buffer);
+        else if (typeof DecompressionStream !== 'undefined' && typeof Response !== 'undefined') {
+            inflated = new Response(new Blob([b64bytes(b64)]).stream().pipeThrough(new DecompressionStream('deflate'))).arrayBuffer();
+        } else return Promise.resolve({});
+        return inflated.then(function (buf) {
             var bits = new Uint8Array(buf), set = {}, offset = len - anchorIdx - 1;
             videoIds.forEach(function (id, i) {
                 var j = i + offset;
@@ -168,11 +172,18 @@ var Lib = (function () {
         var it = item(meta.id), st = it && it.state;
         if (rec && rec[2] === 1) { out.watched = true; out.progress = 1; return out; }
         if (rec && rec[2] === -1) return out;
+        if (rec && rec[1] > 0 && rec[0] / rec[1] >= 0.9) { out.watched = true; out.progress = 1; return out; }
         if (rec && rec[1] > 0 && rec[0] > 0) { out.time = rec[0]; out.progress = Math.min(1, rec[0] / rec[1]); return out; }
         if (st && st.video_id === videoId && st.timeOffset > 1000 && st.duration > 0) {
             out.time = st.timeOffset / 1000; out.progress = Math.min(1, st.timeOffset / st.duration); return out;
         }
-        if ((stremioWatched[meta.id] || {})[videoId]) { out.watched = true; out.progress = 1; }
+        if ((stremioWatched[meta.id] || {})[videoId]) { out.watched = true; out.progress = 1; return out; }
+        // Episodes before the one you are on (or were last on) count as watched.
+        if (st && st.video_id && st.lastWatched && st.video_id !== videoId) {
+            var eps = sortedEpisodes(meta), at = -1, me = -1;
+            eps.forEach(function (v, i) { if (v.id === st.video_id) at = i; if (v.id === videoId) me = i; });
+            if (me !== -1 && at !== -1 && me < at) { out.watched = true; out.progress = 1; }
+        }
         return out;
     }
 

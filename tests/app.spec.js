@@ -337,6 +337,7 @@ test('series: watched/in-progress episodes on thumbnails; finished episode keeps
   await expect(eps.nth(0).locator('.ep-seen')).toBeVisible();
   await expect(eps.nth(1).locator('.ep-seen')).toBeVisible();
   await expect(eps.nth(2).locator('.ep-seen')).toHaveCount(0);
+  await expect(eps.nth(0).locator('.card-progress div')).toHaveAttribute('style', /width: ?100%/);   // finished: full bar
   await expect(eps.nth(2).locator('.card-progress div')).toHaveAttribute('style', /width: ?50%/);
   await expect(eps.nth(2)).toContainText('Reprendre à 10:00');
   // Finishing the last episode of season 1 moves the show to S2E1 instead of dropping it.

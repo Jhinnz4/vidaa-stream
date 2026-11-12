@@ -153,3 +153,20 @@ test('home: new episodes row; rows can be hidden and reordered', async ({ page }
   await key(page, 'Backspace');                                   // back on home: rebuilt
   await expect(page.locator('.row h3')).toHaveText(['Ma liste', 'Nouveaux épisodes', 'Populaires — Séries']);
 });
+
+test('episodes before the current one show as watched (full bar), without Stremio data', async ({ page }) => {
+  const item = { _id: 'tt2000000', name: 'Série 1', type: 'series', removed: false, temp: false, _ctime: '2026-01-01T00:00:00.000Z', _mtime: '2026-01-01T00:00:00.000Z',
+    state: { lastWatched: new Date().toISOString(), timeOffset: 300000, duration: 1200000, video_id: 'tt2000000:2:2' } };
+  await mock(page, { library: [item] });
+  await page.addInitScript(() => { delete window.DecompressionStream; });
+  await openSeries(page);
+  await expect(page.locator('.seasons .btn.selected')).toHaveText('Saison 2');
+  const eps = page.locator('.ep-row');
+  await expect(eps.nth(0).locator('.ep-seen')).toBeVisible();
+  await expect(eps.nth(0).locator('.card-progress div')).toHaveAttribute('style', /width: ?100%/);
+  await expect(eps.nth(1).locator('.ep-seen')).toHaveCount(0);
+  await expect(eps.nth(1).locator('.card-progress div')).toHaveAttribute('style', /width: ?25%/);
+  await expect(eps.nth(2).locator('.card-progress')).toHaveCount(0);
+  await page.locator('.seasons .btn', { hasText: 'Saison 1' }).evaluate((b) => b._onSelect(b));
+  await expect(page.locator('.ep-seen')).toHaveCount(3);
+});
