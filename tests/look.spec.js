@@ -1,0 +1,20 @@
+const { test } = require('@playwright/test');
+const { mock } = require('./fixtures');
+test.skip(!process.env.SHOTS, 'screenshots on demand');
+test('look', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await mock(page);
+  await page.goto('/');
+  await page.locator('.profiles h1').waitFor();
+  await page.keyboard.press('Enter');
+  await page.locator('.row').nth(1).waitFor();
+  await page.evaluate(() => App.push(Views.detail('series', 'tt2000000')));
+  await page.locator('.ep-row').first().waitFor();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: process.env.SHOTS + '/detail.png' });
+  await page.evaluate(() => App.push(Views.homeEdit()));
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: process.env.SHOTS + '/homeedit.png' });
+});

@@ -30,6 +30,7 @@ Views.ui = (function () {
             onFocus: function () { if (extra.onFocus) extra.onFocus(m); }
         },
             h('div.card-img', null, poster(m.poster || art(m.id, 'poster')),
+                extra.badge ? h('div.card-badge', { text: extra.badge }) : null,
                 extra.progress ? h('div.card-progress', null, h('div', { style: 'width:' + Math.round(extra.progress * 100) + '%' })) : null),
             h('div.card-title', { text: m.name || '' }),
             extra.sub ? h('div.card-sub', { text: extra.sub }) : null);
@@ -134,7 +135,18 @@ Views.ui = (function () {
         return { el: el, show: show };
     }
 
-    return { card: card, row: row, grid: grid, sidebar: sidebar, poster: poster, avatar: avatar, hero: hero, art: art };
+    // Home catalog rows in the profile's order, hidden ones flagged.
+    function catKey(c) { return (c.addon.transportUrl || '') + '|' + c.cat.type + '|' + c.cat.id; }
+    function homeRows() {
+        var cfg = Profiles.prefs().homeRows || {}, order = cfg.order || [], hidden = cfg.hidden || [];
+        return API.homeCatalogs().map(function (c, i) {
+            var k = catKey(c), pos = order.indexOf(k);
+            return { c: c, key: k, hidden: hidden.indexOf(k) !== -1, rank: pos === -1 ? 1000 + i : pos };
+        }).sort(function (a, b) { return a.rank - b.rank; });
+    }
+
+    return { card: card, row: row, grid: grid, sidebar: sidebar, poster: poster, avatar: avatar, hero: hero, art: art,
+        homeRows: homeRows };
 })();
 
 Views.home = function () {
@@ -145,6 +157,7 @@ Views.home = function () {
     var main = h('main.content.home', null, hero.el, rows);
     var el = h('div.screen', null, ui.sidebar('home'), main);
     var keysAtStart = App.keyCount();
+    var rowsSig = JSON.stringify(Profiles.prefs().homeRows);
     var focusHero = function (m) { hero.show(m); };
 
     function epSub(it) {
@@ -179,6 +192,17 @@ Views.home = function () {
     var libBox = h('div');
     rows.appendChild(libBox);
     libRows().forEach(function (r) { libBox.appendChild(r); });
+    // New episodes of the series you follow (filled in when known).
+    var newBox = h('div');
+    rows.appendChild(newBox);
+    Lib.newEpisodes().then(function (list) {
+        if (!list.length || !newBox.isConnected) return;
+        newBox.appendChild(ui.row('Nouveaux épisodes', list.map(function (n) {
+            var v = n.video;
+            return ui.card({ id: n.meta.id, type: 'series', name: n.meta.name || n.item.name, poster: n.meta.poster || n.item.poster },
+                { badge: n.count > 1 ? n.count + ' nouveaux' : 'Nouveau', sub: 'S' + v.season + ' · É' + (v.episode || v.number), onFocus: focusHero });
+        })));
+    });
     var sig = libSig();
 
     function catName(c) {
@@ -187,7 +211,7 @@ Views.home = function () {
     }
 
     // Catalog rows in addon order; each slot is reserved so rows never jump around.
-    API.homeCatalogs().slice(0, 12).forEach(function (c) {
+    ui.homeRows().filter(function (r) { return !r.hidden; }).map(function (r) { return r.c; }).slice(0, 12).forEach(function (c) {
         var slot = h('div');
         rows.appendChild(slot);
         API.catalog(c.addon, c.cat).then(function (metas) {
@@ -224,5 +248,9 @@ Views.home = function () {
     // Series that dropped out of "continue watching" after a finished episode come back.
     Lib.repairContinue().then(function () { refreshLib(false); });
 
-    return { name: 'home', el: el, onShow: function () { refreshLib(true); } };
+    return { name: 'home', el: el, onShow: function () {
+        // Rows were customised in Réglages: rebuild the page.
+        if (JSON.stringify(Profiles.prefs().homeRows) !== rowsSig) { setTimeout(function () { App.reset(Views.home()); }, 0); return; }
+        refreshLib(true);
+    } };
 };

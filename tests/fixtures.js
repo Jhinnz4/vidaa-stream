@@ -64,15 +64,19 @@ async function mock(page, { loggedIn = true, library = [] } = {}) {
     }
     const mm = u.match(/\/meta\/(\w+)\/(\w+)\.json/);
     if (mm) {
-      const meta = { id: mm[2], type: mm[1], name: mm[1] === 'movie' ? 'Le Film' : 'La Série', description: 'Desc', releaseInfo: '2020', genres: ['Drame'] };
+      const meta = { id: mm[2], type: mm[1], name: mm[1] === 'movie' ? 'Le Film' : 'La Série', description: 'Desc', releaseInfo: '2020', genres: ['Drame'],
+        cast: ['Ana Actrice', 'Bob Acteur'], director: ['Cléo Réal'], trailerStreams: [{ title: 'Trailer', ytId: 'yt123' }] };
       if (mm[1] === 'series') {
         meta.videos = [];
-        for (let s = 1; s <= 2; s++) for (let e = 1; e <= 3; e++) meta.videos.push({ id: `${mm[2]}:${s}:${e}`, season: s, episode: e, title: `Ep ${s}x${e}` });
+        for (let s = 1; s <= 2; s++) for (let e = 1; e <= 3; e++) meta.videos.push({ id: `${mm[2]}:${s}:${e}`, season: s, episode: e, title: `Ep ${s}x${e}`,
+          released: new Date(Date.now() - (s === 2 && e === 3 ? 3 : 400) * 86400000).toISOString() });
       }
       return route.fulfill({ json: { meta } });
     }
     return route.fulfill({ status: 404, body: '' });
   });
+  await page.route('https://api.skipdb.tv/**', (route) => route.fulfill({ json: { segments: { intro: { start_ms: 10000, end_ms: 70000 }, recap: null, outro: null } } }));
+  await page.route('https://www.youtube-nocookie.com/**', (route) => route.fulfill({ body: '<html></html>', contentType: 'text/html' }));
   await page.route('https://torr.test/**', (route) => route.fulfill({ json: { streams: movieStreams } }));
   await page.route('https://subs.test/**', (route) => {
     if (route.request().url().endsWith('.srt')) return route.fulfill({ body: SRT, contentType: 'text/plain' });

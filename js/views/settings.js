@@ -49,6 +49,10 @@ Views.settings = function () {
     list.appendChild(option('Sous-titres par défaut', 'Charge automatiquement des sous-titres au lancement.',
         [{ v: 'off', label: 'Aucun' }, { v: 'fr', label: 'Français' }], 'subsDefault'));
 
+    section('Accueil (' + me.name + ')');
+    list.appendChild(row('Personnaliser l’accueil', 'Choisir et réordonner les rangées de catalogues.', null,
+        function () { App.push(Views.homeEdit()); }));
+
     section('Compte et sources');
     list.appendChild(row('Recharger les addons', 'Après avoir installé ou configuré un addon sur le PC.', null, function () {
         U.toast('Mise à jour des addons…');
@@ -73,4 +77,62 @@ Views.settings = function () {
     list.appendChild(h('p.muted.small.version', { text: 'Stream+ v2 · ' + navigator.userAgent }));
 
     return { name: 'settings', el: el };
+};
+
+// Home rows editor: OK shows/hides a row, ↑/↓ buttons move it.
+Views.homeEdit = function () {
+    'use strict';
+    var h = U.h;
+    var listEl = h('div.home-edit', { 'data-group': '' });
+    var el = h('div.page', null,
+        h('header.page-head', null, h('h2', { text: 'Personnaliser l’accueil' }),
+            h('div.page-tools', null, h('button.btn.small.f', { text: 'Réinitialiser', onSelect: function () {
+                Profiles.setPref('homeRows', null);
+                render(null, null);
+                U.toast('Accueil réinitialisé');
+            } }))),
+        h('p.muted', { text: 'OK sur une rangée : l’afficher ou la masquer. Les flèches à droite la déplacent. Pris en compte au retour à l’accueil.' }),
+        h('div.sy.page-body', null, listEl));
+    var typeName = { movie: 'Films', series: 'Séries' };
+
+    function saveFrom(rows) {
+        Profiles.setPref('homeRows', {
+            order: rows.map(function (r) { return r.key; }),
+            hidden: rows.filter(function (r) { return r.hidden; }).map(function (r) { return r.key; })
+        });
+    }
+
+    function render(focusKey, focusPart) {
+        var rows = Views.ui.homeRows();
+        U.clear(listEl);
+        var target = null;
+        rows.forEach(function (r, i) {
+            function move(d) {
+                var j = i + d;
+                if (j < 0 || j >= rows.length) return;
+                var tmp = rows[i]; rows[i] = rows[j]; rows[j] = tmp;
+                saveFrom(rows);
+                render(r.key, d < 0 ? 'up' : 'down');
+            }
+            var name = (r.c.cat.name || r.c.cat.id) + ' — ' + (typeName[r.c.cat.type] || r.c.cat.type);
+            var toggle = h('div.setting.f', { onSelect: function () {
+                r.hidden = !r.hidden;
+                saveFrom(rows);
+                render(r.key, 'toggle');
+            } }, h('div', null, h('div.setting-label', { text: name }),
+                h('div.muted.small', { text: (r.c.addon.manifest && r.c.addon.manifest.name) || '' })),
+                h('span.setting-value', { text: r.hidden ? 'Masquée' : 'Affichée' }));
+            var up = h('button.btn.small.f', { text: '↑', onSelect: function () { move(-1); } });
+            var down = h('button.btn.small.f', { text: '↓', onSelect: function () { move(1); } });
+            if (i === 0) up.disabled = true;
+            if (i === rows.length - 1) down.disabled = true;
+            listEl.appendChild(h('div.home-edit-row' + (r.hidden ? '.off' : ''), { 'data-vanchor': '' }, toggle, up, down));
+            if (r.key === focusKey) target = focusPart === 'up' ? (up.disabled ? toggle : up) : focusPart === 'down' ? (down.disabled ? toggle : down) : toggle;
+        });
+        if (target) Nav.focus(target);
+        else if (!focusKey && listEl.querySelector('.f')) listEl.querySelector('.f').classList.add('autofocus');
+    }
+    render(null, null);
+
+    return { name: 'homeEdit', el: el };
 };

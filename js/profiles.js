@@ -5,7 +5,7 @@ var Profiles = (function () {
     'use strict';
 
     var KEY = 'profiles', CUR = 'currentProfile', MAX = 6;
-    var DEFAULT_PREFS = { preferFrench: true, quality: '1080p', hideBad: false, subsDefault: 'off' };
+    var DEFAULT_PREFS = { preferFrench: true, quality: '1080p', hideBad: false, subsDefault: 'off', homeRows: null };
 
     // ── Avatars: drawn in SVG (no network, sharp at any size) ──
     var AV = [

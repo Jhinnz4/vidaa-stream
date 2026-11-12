@@ -1,6 +1,6 @@
 // Search with an on-screen keyboard (left) and live results (right).
 // No TV keyboard involved, so nothing can close it mid-typing.
-Views.search = function () {
+Views.search = function (initial) {
     'use strict';
     var h = U.h, ui = Views.ui;
     var results = h('div.search-results.sy');
@@ -67,6 +67,7 @@ Views.search = function () {
 
     var debounced = U.debounce(run, 600);
     showRecent();
+    if (initial) { kb.set(initial); run(initial); }
 
     return {
         name: 'search', el: el,
