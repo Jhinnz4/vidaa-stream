@@ -150,8 +150,8 @@ test('browse: Films grid with genre filter', async ({ page }) => {
   await expect(page.locator('.grid .card')).toHaveCount(20);
   expect((await focused(page)).cls).toContain('card');            // focus enters the page
   await expect(page.locator('.chip')).toHaveText(['Populaires', 'Tous les genres', 'Action', 'Drame']);
-  await key(page, 'ArrowUp', 3);
-  await key(page, 'ArrowRight');
+  await key(page, 'ArrowUp', 3);                                  // catalog chips (top line)
+  await key(page, 'ArrowDown');                                   // genre chips
   for (let i = 0; i < 4 && (await focused(page)).text !== 'Action'; i++) await key(page, 'ArrowRight');
   expect((await focused(page)).text).toBe('Action');
   await key(page, 'Enter');
@@ -350,4 +350,63 @@ test('series: watched/in-progress episodes on thumbnails; finished episode keeps
   expect(st.s.timeOffset).toBe(1);
   expect(st.ep.watched).toBe(true);
   expect(st.cw).toBe(1);
+});
+
+test('remote edges: ↓/↑ at the ends never open the menu, → at a row end stays in the row', async ({ page }) => {
+  await mock(page);
+  await start(page);
+  await expect(page.locator('.row')).toHaveCount(2);
+  await page.waitForTimeout(300);
+  await key(page, 'ArrowUp');                                   // top row, nothing above
+  expect((await focused(page)).cls).not.toContain('side-item');
+  await key(page, 'ArrowRight', 30);                            // end of the row
+  expect((await focused(page)).text).toBe('Film 20');
+  await key(page, 'ArrowDown');                                 // last row
+  expect((await focused(page)).text).toMatch(/^Série/);
+  await key(page, 'ArrowDown');
+  expect((await focused(page)).text).toMatch(/^Série/);
+  await key(page, 'ArrowRight', 30);
+  await key(page, 'ArrowDown');
+  expect((await focused(page)).cls).not.toContain('side-item');
+  await key(page, 'ArrowLeft', 19);                             // start of the row, then ← opens the menu
+  expect((await focused(page)).text).toBe('Série 1');
+  await key(page, 'ArrowDown');
+  expect((await focused(page)).cls).not.toContain('side-item');
+  await key(page, 'ArrowLeft');
+  expect((await focused(page)).cls).toContain('side-item');
+  await key(page, 'ArrowLeft', 2);                              // nothing further left: stays in the menu
+  expect((await focused(page)).cls).toContain('side-item');
+  await key(page, 'ArrowRight');
+  expect((await focused(page)).text).toBe('Série 1');
+  // Browse grid: ↓ on the last line, ↑ on the chips.
+  await openSidebar(page, 'Films');
+  await expect(page.locator('.grid .card')).toHaveCount(20);
+  await key(page, 'ArrowDown', 10);
+  expect((await focused(page)).cls).toContain('card');
+  await key(page, 'ArrowUp', 10);
+  expect((await focused(page)).cls).not.toContain('side-item');
+});
+
+test('player: OK on the progress bar pauses and resumes; seeking focuses the bar', async ({ page }) => {
+  await mock(page);
+  await page.route('https://media.test/**', () => {});
+  await openFilm(page);
+  await key(page, 'Enter');
+  await expect(page.locator('.player')).toBeVisible();
+  await page.evaluate(() => {
+    const v = document.querySelector('video'); let p = false;
+    Object.defineProperty(v, 'paused', { get: () => p });
+    Object.defineProperty(v, 'duration', { get: () => 3600 });
+    v.play = () => { p = false; v.dispatchEvent(new Event('playing')); return Promise.resolve(); };
+    v.pause = () => { p = true; v.dispatchEvent(new Event('pause')); };
+  });
+  const paused = () => page.evaluate(() => document.querySelector('video').paused);
+  await key(page, 'ArrowRight');                                 // seek with the controls hidden
+  await expect(page.locator('.osd')).toBeVisible();
+  expect((await focused(page)).cls).toContain('progress');
+  await key(page, 'Enter');
+  expect(await paused()).toBe(true);
+  await key(page, 'Enter');
+  expect(await paused()).toBe(false);
+  expect(await page.locator('.player').count()).toBe(1);          // OK never re-fires the list underneath
 });

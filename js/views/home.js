@@ -51,7 +51,16 @@ Views.ui = (function () {
     // Icon rail that opens (labels) while it has focus, over the content.
     function sidebar(active) {
         var nav;
-        function open() { nav.classList.add('open'); }
+        // Entering the menu lands on the current section; → goes back where you were.
+        function open(el) {
+            nav.classList.add('open');
+            var from = Nav.previous();
+            if (from && !nav.contains(from)) {
+                nav._from = from;
+                var act = nav.querySelector('.side-item.active');
+                if (act && act !== el) Nav.focus(act);
+            }
+        }
         function close(_, next) { if (!next || !nav.contains(next)) nav.classList.remove('open'); }
         function railRect() {
             var r = this.getBoundingClientRect();
@@ -69,6 +78,11 @@ Views.ui = (function () {
         }
         // Up/down stay inside the rail (in order); right uses the narrow rail box.
         function railMove(dir) {
+            if (dir === 'left') return true;                 // edge of the screen
+            if (dir === 'right' && nav._from && nav._from.isConnected && nav._from.offsetParent) {
+                Nav.focus(nav._from);
+                return true;
+            }
             if (dir !== 'up' && dir !== 'down') return false;
             var all = Array.prototype.slice.call(nav.querySelectorAll('.side-item.f'));
             var i = all.indexOf(this) + (dir === 'down' ? 1 : -1);
@@ -77,7 +91,7 @@ Views.ui = (function () {
         }
         function withRail(el) { el._navRect = railRect; el._onMove = railMove; return el; }
         var me = Profiles.current();
-        nav = h('nav.sidebar', { 'data-group': '' },
+        nav = h('nav.sidebar', { 'data-group': '', 'data-nav-enter': 'left' },
             withRail(h('div.side-item.side-profile.f', { onFocus: open, onBlur: close,
                 onSelect: function () { App.reset(Views.profiles()); } },
                 h('span.side-icon', null, avatar(me)), h('span.side-label', { text: me.name }))),

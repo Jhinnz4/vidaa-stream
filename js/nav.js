@@ -5,7 +5,7 @@
 var Nav = (function () {
     'use strict';
 
-    var cur = null;
+    var cur = null, prevFocus = null;
     var rootFn = function () { return document.body; };
 
     function visible(el) {
@@ -64,11 +64,31 @@ var Nav = (function () {
         return bestEl;
     }
 
+    // A zone marked data-nav-enter="left" (the sidebar) is only entered with
+    // that direction: ↓ at the bottom of a page must not land in the menu.
+    function enterable(el, dir, from) {
+        var z = el.closest('[data-nav-enter]');
+        if (!z || z.contains(from)) return true;
+        return z.getAttribute('data-nav-enter').split(' ').indexOf(dir) !== -1;
+    }
+
     function move(dir) {
         var root = rootFn();
-        var list = focusables(root);
         if (!cur || !root.contains(cur) || !visible(cur)) { focusFirst(root); return true; }
         if (cur._onMove && cur._onMove(dir) === true) return true;
+        // ←/→ inside a horizontal row stays in it (never jumps to another row at the end).
+        var row = (dir === 'left' || dir === 'right') ? cur.closest('.sx') : null;
+        var list = focusables(root).filter(function (el) {
+            if (!enterable(el, dir, cur)) return false;
+            var o = el.closest('.sx');
+            if (row && o && o !== row) return false;
+            // Cards scrolled out of another row are not targets (they sit off-screen).
+            if (o && o !== row && !(o.contains(cur))) {
+                var r = el.getBoundingClientRect(), orr = o.getBoundingClientRect();
+                if (r.right <= orr.left + 2 || r.left >= orr.right - 2) return false;
+            }
+            return true;
+        });
         var target = best(dir, cur, list, true) || best(dir, cur, list, false);
         if (!target) return false;
         var g = groupOf(target);
@@ -105,6 +125,7 @@ var Nav = (function () {
     function focus(el) {
         if (!el) return;
         var prev = cur;
+        if (prev !== el) prevFocus = prev;
         if (prev && prev !== el) {
             prev.classList.remove('focused');
             if (prev.tagName === 'INPUT' && document.activeElement === prev) prev.blur();
@@ -128,7 +149,8 @@ var Nav = (function () {
     }
 
     function activate() {
-        if (!cur) return;
+        // Focus left behind on a lower layer (e.g. the source list under the player) must not fire.
+        if (!cur || !rootFn().contains(cur) || !visible(cur)) { focusFirst(); return; }
         if (cur.tagName === 'INPUT') { cur.focus(); return; }     // opens the TV keyboard
         if (cur._onSelect) cur._onSelect(cur);
     }
@@ -137,6 +159,7 @@ var Nav = (function () {
         setRoot: function (fn) { rootFn = fn; },
         move: move, focus: focus, focusFirst: focusFirst, activate: activate,
         current: function () { return cur; },
+        previous: function () { return prevFocus; },
         remember: function (root) { if (root && cur && root.contains(cur)) root._lastFocus = cur; }
     };
 })();

@@ -12,7 +12,7 @@ Views.player = function (opts) {
     var subsEl = h('div.player-subs');
     var spinner = h('div.spinner.player-spinner');
     var fill = h('div.progress-fill'), buf = h('div.progress-buf'), knob = h('div.progress-knob');
-    var progress = h('div.progress.f', null, buf, fill, knob);
+    var progress = h('div.progress.f', { onSelect: function () { togglePlay(); } }, buf, fill, knob);
     var tCur = h('span', { text: '0:00' }), tDur = h('span', { text: '0:00' });
     var playBtn = h('button.btn.f', { text: '❚❚', onSelect: togglePlay });
     var info = h('div.osd-info.muted');
@@ -214,7 +214,8 @@ Views.player = function (opts) {
     function showOsd(keepFocus) {
         if (destroyed || !errBox.classList.contains('hidden')) return;
         osd.classList.remove('hidden');
-        if (!keepFocus && (!Nav.current() || !osd.contains(Nav.current()))) Nav.focus(playBtn);
+        // Seeking puts focus on the bar (←/→ keep seeking, OK plays/pauses).
+        if (!Nav.current() || !osd.contains(Nav.current())) Nav.focus(keepFocus ? progress : playBtn);
         bumpHide();
     }
     function hideOsd() { osd.classList.add('hidden'); clearTimeout(hideTimer); }
