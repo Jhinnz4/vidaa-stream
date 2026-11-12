@@ -43,11 +43,39 @@ var Lib = (function () {
         return function (a, b) { return new Date(field(b) || 0) - new Date(field(a) || 0); };
     }
 
+    // Titles removed from "continue watching" by hand: {id: lastWatched at that time}.
+    // Watching again (new lastWatched) brings them back.
+    function dismissKey() { return 'cwHidden_' + Profiles.current().id; }
+    function dismissed(it) {
+        var d = U.store.get(dismissKey(), {});
+        return d.hasOwnProperty(it._id) && d[it._id] === ((it.state && it.state.lastWatched) || null);
+    }
+    function dismissContinue(id) {
+        var it = item(id);
+        if (!it) return;
+        var d = U.store.get(dismissKey(), {});
+        d[id] = (it.state && it.state.lastWatched) || null;
+        U.store.set(dismissKey(), d);
+    }
+
     function continueWatching() {
         return items().filter(function (it) {
             var s = it.state || {};
-            return (!it.removed || it.temp) && s.timeOffset > 0 && s.lastWatched;
+            return (!it.removed || it.temp) && s.timeOffset > 0 && s.lastWatched && !dismissed(it);
         }).sort(byRecent(function (it) { return it.state.lastWatched; }));
+    }
+    function inContinue(id) {
+        return continueWatching().some(function (it) { return it._id === id; });
+    }
+
+    // Audio / subtitle language chosen by hand, remembered per title and profile.
+    function trackKey() { return 'tracks_' + Profiles.current().id; }
+    function trackPref(metaId) { return U.store.get(trackKey(), {})[metaId] || {}; }
+    function setTrackPref(metaId, kind, value) {
+        var all = U.store.get(trackKey(), {});
+        var p = all[metaId] || (all[metaId] = {});
+        p[kind] = value;
+        U.store.set(trackKey(), all);
     }
 
     // ── Episodes ──
@@ -71,6 +99,28 @@ var Lib = (function () {
         var m = all[metaId] || (all[metaId] = {});
         m[videoId] = [Math.round(t), Math.round(d), watched ? 1 : 0];
         U.store.set(epKey(), all);
+    }
+
+    // Mark episodes watched / not watched by hand (-1 = explicitly not watched,
+    // overrides what Stremio says). Watched ones move "continue" past them.
+    function setWatched(meta, videoIds, on) {
+        var all = epAll();
+        var m = all[meta.id] || (all[meta.id] = {});
+        videoIds.forEach(function (id) { m[id] = [0, 0, on ? 1 : -1]; });
+        U.store.set(epKey(), all);
+        var it = item(meta.id);
+        if (!it || !it.state || videoIds.indexOf(it.state.video_id) === -1) return Promise.resolve();
+        var copy = JSON.parse(JSON.stringify(it));
+        if (on) {
+            var eps = sortedEpisodes(meta), last = -1;
+            eps.forEach(function (v, i) { if (videoIds.indexOf(v.id) !== -1) last = i; });
+            var next = eps[last + 1];
+            if (next) { copy.state.video_id = next.id; copy.state.timeOffset = 1; copy.state.duration = 0; }
+            else copy.state.timeOffset = 0;
+        } else {
+            copy.state.timeOffset = 0;
+        }
+        return commit(copy);
     }
 
     // Episodes marked watched by Stremio itself (other devices / the official
@@ -116,7 +166,8 @@ var Lib = (function () {
         var out = { progress: 0, time: 0, watched: false };
         var rec = (epAll()[meta.id] || {})[videoId];
         var it = item(meta.id), st = it && it.state;
-        if (rec && rec[2]) { out.watched = true; out.progress = 1; return out; }
+        if (rec && rec[2] === 1) { out.watched = true; out.progress = 1; return out; }
+        if (rec && rec[2] === -1) return out;
         if (rec && rec[1] > 0 && rec[0] > 0) { out.time = rec[0]; out.progress = Math.min(1, rec[0] / rec[1]); return out; }
         if (st && st.video_id === videoId && st.timeOffset > 1000 && st.duration > 0) {
             out.time = st.timeOffset / 1000; out.progress = Math.min(1, st.timeOffset / st.duration); return out;
@@ -132,7 +183,7 @@ var Lib = (function () {
         var cutoff = Date.now() - 60 * 86400000;
         var todo = items().filter(function (it) {
             var s = it.state || {};
-            return it.type === 'series' && !repaired[it._id] && (!it.removed || it.temp) && !(s.timeOffset > 0)
+            return it.type === 'series' && !repaired[it._id] && (!it.removed || it.temp) && !(s.timeOffset > 0) && !dismissed(it)
                 && /:\d+:\d+$/.test(s.video_id || '') && s.lastWatched && new Date(s.lastWatched) > cutoff;
         }).slice(0, 10);
         return Promise.all(todo.map(function (it) {
@@ -191,8 +242,41 @@ var Lib = (function () {
         return commit(it);
     }
 
+    // Series you follow (list + continue) with an episode out in the last 3 weeks
+    // that you have not watched: [{item, meta, video}], newest first.
+    var metaCache = {};
+    function newEpisodes() {
+        var seen = {}, series = continueWatching().concat(myList()).filter(function (it) {
+            if (it.type !== 'series' || seen[it._id]) return false;
+            seen[it._id] = true;
+            return true;
+        }).slice(0, 20);
+        var now = Date.now(), from = now - 21 * 86400000;
+        return Promise.all(series.map(function (it) {
+            var c = metaCache[it._id];
+            var p = c && now - c.at < 3600000 ? Promise.resolve(c.meta)
+                : API.meta('series', it._id).then(function (m) { metaCache[it._id] = { at: now, meta: m }; return m; });
+            return p.then(function (meta) {
+                if (!meta.id) meta.id = it._id;
+                if (!meta.type) meta.type = 'series';
+                return loadWatched(meta).then(function () {
+                    var fresh = sortedEpisodes(meta).filter(function (v) {
+                        var t = v.released ? new Date(v.released).getTime() : 0;
+                        return t >= from && t <= now && !episodeState(meta, v.id).watched;
+                    });
+                    if (!fresh.length) return null;
+                    return { item: it, meta: meta, video: fresh[0], count: fresh.length,
+                        released: new Date(fresh[fresh.length - 1].released).getTime() };
+                });
+            }).catch(function () { return null; });
+        })).then(function (list) {
+            return list.filter(Boolean).sort(function (a, b) { return b.released - a.released; });
+        });
+    }
+
     return { item: item, continueWatching: continueWatching, myList: myList, inList: inList,
         setInList: setInList, saveProgress: saveProgress, isOwner: isOwner,
         nextEpisode: nextEpisode, episodeState: episodeState, loadWatched: loadWatched,
-        repairContinue: repairContinue, _decodeWatched: decodeWatched };
+        repairContinue: repairContinue, dismissContinue: dismissContinue, inContinue: inContinue,
+        setWatched: setWatched, trackPref: trackPref, setTrackPref: setTrackPref, newEpisodes: newEpisodes, _decodeWatched: decodeWatched };
 })();

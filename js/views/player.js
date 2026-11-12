@@ -32,12 +32,28 @@ Views.player = function (opts) {
                 nextVid ? h('button.btn.f', { text: 'Épisode suivant ▶', onSelect: playNext }) : null)));
     var errBox = h('div.player-error.hidden');
     var seekBadge = h('div.seek-badge.hidden');
-    var el = h('div.player', null, v, subsEl, spinner, seekBadge, osd, errBox);
+    // "Passer l'intro" and the next-episode countdown float above the video;
+    // with the controls hidden, OK triggers them and Back dismisses the countdown.
+    var skipBtn = h('button.btn.primary.f', { onSelect: function () { if (skipAction) skipAction(); } });
+    var skipBox = h('div.skip-box.hidden', null, skipBtn);
+    var nextCount = h('div.next-count');
+    var nextBox = h('div.next-box.hidden', null,
+        h('div.muted.small', { text: 'Épisode suivant' }),
+        h('div.next-title', { text: nextVid ? 'S' + nextVid.season + ' · É' + (nextVid.episode || nextVid.number) +
+            (nextVid.title || nextVid.name ? '  ' + (nextVid.title || nextVid.name) : '') : '' }),
+        nextCount,
+        h('div.dialog-buttons', { 'data-group': '' },
+            h('button.btn.primary.f', { text: 'Lire maintenant', onSelect: function () { stopCountdown(false); playNext(); } }),
+            h('button.btn.f', { text: 'Annuler', onSelect: function () { stopCountdown(true); } })));
+    var el = h('div.player', null, v, subsEl, spinner, seekBadge, skipBox, nextBox, osd, errBox);
 
     var hideTimer = null, saveTimer = null, subsTimer = null, stallTimer = null;
     var cues = [], subsList = null, subsChosen = null, lastSubText = '';
     var seekTarget = null, seekTimer = null, lastSeekKey = 0, seekStreak = 0;
     var destroyed = false, frenchPicked = false;
+    var segs = null, skipAction = null, skipKind = null;
+    var countdown = null, countLeft = 0, nextCancelled = false;
+    var tracks = Lib.trackPref(meta.id);
 
     // ── Playback ──
     function start() {
@@ -46,6 +62,64 @@ Views.player = function (opts) {
         saveTimer = setInterval(save, 20000);
         subsTimer = setInterval(drawSubs, 200);
         loadSubsList();
+        loadSegments();
+    }
+
+    // ── Intro / recap / credits (community timings from SkipDB, by IMDb id) ──
+    function loadSegments() {
+        var m = /^(tt\d+)(?::(\d+):(\d+))?$/.exec(videoId);
+        if (!m) return;
+        U.fetchJson('https://api.skipdb.tv/api/segments?imdb_id=' + m[1] + (m[2] ? '&season=' + m[2] + '&episode=' + m[3] : ''), null, 8000)
+            .then(function (r) { if (!destroyed && r && r.segments) segs = r.segments; }, function () {});
+    }
+    function seg(name) {
+        var x = segs && segs[name];
+        return x && x.end_ms > x.start_ms ? { start: x.start_ms / 1000, end: x.end_ms / 1000 } : null;
+    }
+    function jumpTo(t) { v.currentTime = t; hideSkip(); if (v.paused) v.play().catch(function () {}); }
+    function showSkip(kind, label, action) {
+        skipAction = action;
+        if (skipKind === kind) return;
+        skipKind = kind;
+        skipBtn.textContent = label;
+        skipBox.classList.remove('hidden');
+    }
+    function hideSkip() {
+        if (!skipKind) return;
+        skipKind = null; skipAction = null;
+        skipBox.classList.add('hidden');
+        if (Nav.current() === skipBtn) Nav.focus(osdVisible() ? playBtn : progress);
+    }
+    function startCountdown() {
+        if (!nextVid || nextCancelled || countdown) return;
+        countLeft = 10;
+        nextCount.textContent = 'Lecture dans ' + countLeft + ' s';
+        nextBox.classList.remove('hidden');
+        countdown = setInterval(function () {
+            if (v.paused) return;
+            countLeft--;
+            nextCount.textContent = 'Lecture dans ' + countLeft + ' s';
+            if (countLeft <= 0) { stopCountdown(false); playNext(); }
+        }, 1000);
+    }
+    function stopCountdown(cancel) {
+        clearInterval(countdown);
+        countdown = null;
+        if (cancel) nextCancelled = true;
+        nextBox.classList.add('hidden');
+        if (nextBox.contains(Nav.current())) Nav.focus(osdVisible() ? playBtn : progress);
+    }
+    function checkSegments() {
+        var d = v.duration, t = v.currentTime;
+        if (!d || !isFinite(d) || seekTarget !== null || destroyed) return;
+        var recap = seg('recap'), intro = seg('intro'), outro = seg('outro');
+        if (recap && t >= recap.start && t < recap.end - 2) showSkip('recap', 'Passer le récap', function () { jumpTo(recap.end); });
+        else if (intro && t >= intro.start && t < intro.end - 2) showSkip('intro', 'Passer l’intro', function () { jumpTo(intro.end); });
+        else hideSkip();
+        if (!nextVid) return;
+        var creditsAt = outro && outro.start > d * 0.6 ? outro.start : d - 25;
+        if (t >= creditsAt && t < d - 0.5) startCountdown();
+        else if (countdown && t < creditsAt) stopCountdown(false);
     }
 
     function togglePlay() { if (v.paused) v.play().catch(function () {}); else v.pause(); }
@@ -148,6 +222,7 @@ Views.player = function (opts) {
     });
     if (v.audioTracks && v.audioTracks.addEventListener) v.audioTracks.addEventListener('addtrack', function () { pickFrenchAudio(); updateInfo(); });
     v.addEventListener('timeupdate', updateTime);
+    v.addEventListener('timeupdate', checkSegments);
     v.addEventListener('progress', updateTime);
     v.addEventListener('playing', function () { setTimeout(checkAudio, 4000); spinner.classList.add('hidden'); clearTimeout(stallTimer); playBtn.textContent = '❚❚'; });
     v.addEventListener('pause', function () { if (destroyed) return; playBtn.textContent = '▶'; showOsd(); save(); });
@@ -156,7 +231,7 @@ Views.player = function (opts) {
         clearTimeout(stallTimer);
         stallTimer = setTimeout(function () { showError('La vidéo ne charge plus (source lente ou bloquée).'); }, 40000);
     });
-    v.addEventListener('ended', function () { save(); if (nextVid) playNext(); else leave(); });
+    v.addEventListener('ended', function () { save(); stopCountdown(false); if (nextVid && !nextCancelled) playNext(); else leave(); });
     v.addEventListener('error', function () {
         var code = v.error ? v.error.code : 0;
         var msg = {
@@ -231,7 +306,17 @@ Views.player = function (opts) {
     }
     function pickFrenchAudio() {
         var at = v.audioTracks;
-        if (!prefs.preferFrench || frenchPicked || !at || at.length < 2) return;
+        if (frenchPicked || !at || at.length < 2) return;
+        if (tracks.audio) {
+            for (var k = 0; k < at.length; k++) {
+                if ((at[k].language || at[k].label) === tracks.audio) {
+                    frenchPicked = true;
+                    if (!at[k].enabled) for (var j2 = 0; j2 < at.length; j2++) at[j2].enabled = (j2 === k);
+                    return;
+                }
+            }
+        }
+        if (!prefs.preferFrench) return;
         for (var i = 0; i < at.length; i++) {
             if (isFrTrack(at[i])) {
                 frenchPicked = true;
@@ -249,7 +334,10 @@ Views.player = function (opts) {
                 var t = at[i];
                 items.push({ label: t.label || Subs.langName(t.language) || 'Piste ' + (i + 1),
                     sub: t.language || '', selected: t.enabled,
-                    action: function () { for (var j = 0; j < at.length; j++) at[j].enabled = (j === i); } });
+                    action: function () {
+                        for (var j = 0; j < at.length; j++) at[j].enabled = (j === i);
+                        if (t.language || t.label) Lib.setTrackPref(meta.id, 'audio', t.language || t.label);
+                    } });
             })(i);
             if (at.length === 1) note = 'La TV ne voit qu’une piste audio dans ce fichier.';
         } else {
@@ -269,6 +357,11 @@ Views.player = function (opts) {
             .then(function (list) {
                 list.sort(function (a, b) { return Subs.isFrench(b.lang) - Subs.isFrench(a.lang); });
                 subsList = list;
+                if (tracks.sub === 'off') return;
+                if (tracks.sub) {
+                    var same = list.filter(function (s) { return Subs.langName(s.lang) === tracks.sub; })[0];
+                    if (same) { chooseSub(same, true); return; }
+                }
                 if (prefs.subsDefault === 'fr') {
                     var fr = list.filter(function (s) { return Subs.isFrench(s.lang); })[0];
                     if (fr) chooseSub(fr, true);
@@ -293,12 +386,18 @@ Views.player = function (opts) {
     }
     function subsMenu() {
         if (subsList === null) { U.toast('Recherche des sous-titres…'); return; }
-        var items = [{ label: 'Désactivés', selected: !subsChosen, action: function () { chooseSub(null); } }];
+        var items = [{ label: 'Désactivés', selected: !subsChosen, action: function () {
+            Lib.setTrackPref(meta.id, 'sub', 'off');
+            chooseSub(null);
+        } }];
         var count = {};
         subsList.slice(0, 40).forEach(function (s) {
             var name = Subs.langName(s.lang);
             count[name] = (count[name] || 0) + 1;
-            items.push({ label: name + ' ' + count[name], selected: subsChosen === s, action: function () { chooseSub(s); } });
+            items.push({ label: name + ' ' + count[name], selected: subsChosen === s, action: function () {
+                Lib.setTrackPref(meta.id, 'sub', name);
+                chooseSub(s);
+            } });
         });
         App.menu({ title: 'Sous-titres', items: items, note: subsList.length ? null : 'Aucun sous-titre trouvé (addon OpenSubtitles installé ?).' });
     }
@@ -362,7 +461,10 @@ Views.player = function (opts) {
             if (k === 'info' || k === 'red') { updateInfo(); showOsd(); return true; }
             if (!osdVisible()) {
                 if (k === 'left' || k === 'right') { seekBy(k === 'left' ? -1 : 1); return true; }
+                if (k === 'enter' && countdown) { stopCountdown(false); playNext(); return true; }
+                if (k === 'enter' && skipAction) { skipAction(); return true; }
                 if (k === 'enter') { togglePlay(); showOsd(); return true; }
+                if (k === 'back' && countdown) { stopCountdown(true); return true; }
                 if (k === 'up' || k === 'down') { showOsd(); return true; }
                 if (k === 'back') { leave(); return true; }
                 return false;
@@ -376,7 +478,7 @@ Views.player = function (opts) {
         onDestroy: function () {
             destroyed = true;
             [hideTimer, seekTimer, stallTimer].forEach(clearTimeout);
-            [saveTimer, subsTimer].forEach(clearInterval);
+            [saveTimer, subsTimer, countdown].forEach(clearInterval);
             try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {}
         }
     };
